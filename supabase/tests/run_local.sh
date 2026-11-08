@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Runs the migration and access-rule tests on a local Postgres (no Supabase needed).
+# Usage: PGHOST=... PGPORT=... PGUSER=postgres ./supabase/tests/run_local.sh
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+P="psql -v ON_ERROR_STOP=1 -q"
+$P -d postgres -c "drop database if exists bart_test" -c "create database bart_test"
+$P -d bart_test -f supabase/tests/supabase_stub.sql
+$P -d bart_test -f supabase/migrations/0001_core.sql
+$P -d bart_test -f supabase/tests/grants_stub.sql
+$P -d bart_test -f supabase/tests/access_rules_test.sql
