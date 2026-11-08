@@ -54,7 +54,6 @@ export default function ItemDetail() {
     return (
       <main className="screen no-nav" style={{ textAlign: 'center', paddingTop: 120 }}>
         <h1 className="title-push">This item is gone</h1>
-        <p className="body">It may have been traded or taken down.</p>
         <Link href="/" className="btn">Back to feed</Link>
       </main>
     );
@@ -93,7 +92,7 @@ export default function ItemDetail() {
           )}
         </div>
         {item.photo_paths.length > 1 && (
-          <span className="pill white" style={{ position: 'absolute', bottom: 14, right: 20 }}>{item.photo_paths.length} photos · swipe</span>
+          <span className="pill white" style={{ position: 'absolute', bottom: 14, right: 20 }}>1/{item.photo_paths.length}</span>
         )}
       </div>
 
@@ -131,7 +130,7 @@ export default function ItemDetail() {
 
         <div className="row" style={{ background: 'var(--green-tint)', borderRadius: 12, padding: '10px 12px', fontSize: 13, gap: 8 }}>
           <Icon name="shield" size={18} />
-          <span>Meet at a <b>Safe Spot</b>: staffed, public, daytime</span>
+          <span>Meet at a <b>Safe Spot</b></span>
         </div>
 
         {error && <div className="alert">{error}</div>}
@@ -139,9 +138,14 @@ export default function ItemDetail() {
 
       <div className="action-bar">
         {mine ? (
-          item.status === 'active'
-            ? <button className="btn outline" onClick={removeListing}>Take down listing</button>
-            : <Link href="/trades" className="btn">See your trades</Link>
+          item.status === 'active' ? (
+            <>
+              <button className="btn outline" style={{ flex: 1 }} onClick={removeListing}>Take down</button>
+              <Link href={`/item/${item.id}/edit`} className="btn" style={{ flex: 1 }}>Edit</Link>
+            </>
+          ) : item.status === 'removed' ? (
+            <Link href={`/item/${item.id}/edit`} className="btn outline">Edit</Link>
+          ) : <Link href="/trades" className="btn">See your trades</Link>
         ) : item.status === 'active' ? (
           <Link href={`/item/${item.id}/offer`} className="btn"><Icon name="swap" size={20} /> Propose a trade</Link>
         ) : (

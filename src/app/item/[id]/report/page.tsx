@@ -9,11 +9,11 @@ import { Icon } from '@/components/Icon';
 import { PushHeader } from '@/components/ui';
 
 const REASONS = [
-  ['banned_item', 'Banned item', 'Exams, drugs, alcohol, weapons, adult content'],
-  ['scam', 'Scam or fake listing', "Photos don't match, item doesn't exist"],
-  ['unsafe_meetup', 'Unsafe meetup request', 'Asked to meet off campus or at night'],
-  ['harassment', 'Harassment', 'Rude, threatening or creepy messages'],
-  ['other', 'Something else', 'Tell us below'],
+  ['banned_item', 'Banned item'],
+  ['scam', 'Scam or fake listing'],
+  ['unsafe_meetup', 'Unsafe meetup request'],
+  ['harassment', 'Harassment'],
+  ['other', 'Something else'],
 ] as const;
 
 export default function Report() {
@@ -43,8 +43,8 @@ export default function Report() {
         <span style={{ width: 88, height: 88, borderRadius: 999, background: 'var(--blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="shield" size={40} />
         </span>
-        <h1 className="display" style={{ fontSize: 26 }}>Thanks for looking out</h1>
-        <p className="body">Our student team reviews reports within 24 hours. Three reports hides a listing for everyone.</p>
+        <h1 className="display" style={{ fontSize: 28 }}>Thanks for looking out</h1>
+        <p className="body">Reports are anonymous. We review them within 24 hours.</p>
         <Link href="/" className="btn ink">Back to feed</Link>
       </main>
     );
@@ -53,21 +53,21 @@ export default function Report() {
   return (
     <>
       <main className="screen no-nav">
-        <PushHeader title="Report listing" subtitle={title} />
-        <p className="body">Reports are anonymous. The person won&apos;t know it was you.</p>
+        <PushHeader title="Report" />
+        {title && <p style={{ margin: 0, fontSize: 15, fontWeight: 700 }}>{title}</p>}
         <p className="label" style={{ marginBottom: -6 }}>What&apos;s wrong?</p>
         <div className="stack" style={{ gap: 10 }}>
-          {REASONS.map(([value, label, sub]) => (
+          {REASONS.map(([value, label]) => (
             <button key={value} className={`check-row pink ${reason === value ? 'on' : ''}`} onClick={() => setReason(value)}
               role="radio" aria-checked={reason === value}>
               <span className="radio" />
-              <span><div className="row-title">{label}</div><div className="row-sub">{sub}</div></span>
+              <span className="row-title">{label}</span>
             </button>
           ))}
         </div>
         <div>
-          <label className="label" htmlFor="details" style={{ display: 'block' }}>Anything else? (optional)</label>
-          <textarea id="details" className="input" rows={3} maxLength={1000} placeholder="Add details that help our team review"
+          <label className="label" htmlFor="details" style={{ display: 'block' }}>Details</label>
+          <textarea id="details" className="input" rows={3} maxLength={1000} placeholder="Optional"
             value={details} onChange={(e) => setDetails(e.target.value)} />
         </div>
         {error && <div className="alert">{error}</div>}

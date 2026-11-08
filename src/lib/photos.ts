@@ -17,12 +17,30 @@ async function shrink(file: File): Promise<Blob> {
   }
 }
 
-export async function uploadPhoto(userId: string, file: File): Promise<string> {
-  const blob = await shrink(file);
-  const path = `${userId}/${crypto.randomUUID()}.jpg`;
-  const { error } = await supabase.storage.from('listing-photos').upload(path, blob, {
-    contentType: blob.type || 'image/jpeg', upsert: false,
-  });
-  if (error) throw error;
-  return path;
+// Every photo goes through the server, which checks it before storing it (src/app/api/photo/route.ts)
+async function sendToCheck(form: FormData) {
+  const { data } = await supabase.auth.getSession();
+  const res = await fetch('/api/photo', {
+    method: 'POST', body: form, headers: { authorization: `Bearer ${data.session?.access_token ?? ''}` },
+  }).catch(() => null);
+  if (!res) throw new Error("Couldn't reach bart. Check your connection.");
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error ?? 'Photo upload failed.');
+  return json;
+}
+
+export async function uploadPhoto(_userId: string, file: File): Promise<string> {
+  const form = new FormData();
+  form.append('file', await shrink(file), 'photo.jpg');
+  form.append('kind', 'listing');
+  return (await sendToCheck(form)).path as string;
+}
+
+// Chat photos: the server checks it, stores it privately, and adds it to the chat
+export async function uploadChatPhoto(offerId: string, file: File) {
+  const form = new FormData();
+  form.append('file', await shrink(file), 'photo.jpg');
+  form.append('kind', 'chat');
+  form.append('offerId', offerId);
+  return (await sendToCheck(form)).message as { id: string; sender_id: string; body: string | null; image_path: string | null; created_at: string };
 }

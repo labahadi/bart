@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Icon } from './Icon';
+import { Badge, useNotifications } from './Notifications';
 import { photoUrl } from '@/lib/supabase';
 import { CATEGORY_ICON, CATEGORY_TINT, type Listing, type Profile, initial } from '@/lib/trade';
 
@@ -14,11 +15,12 @@ export function Logo({ height = 30 }: { height?: number }) {
 
 export function BottomNav() {
   const path = usePathname();
-  const item = (href: string, icon: 'home' | 'chat' | 'person', label: string) => {
+  const { counts } = useNotifications();
+  const item = (href: string, icon: 'home' | 'people' | 'chat' | 'person', label: string, badge = 0) => {
     const on = href === '/' ? path === '/' : path.startsWith(href);
     return (
       <Link href={href} className={on ? 'on' : ''}>
-        <Icon name={icon} size={22} />
+        <span style={{ position: 'relative', display: 'inline-flex' }}><Icon name={icon} size={22} /><Badge n={badge} /></span>
         {label}
       </Link>
     );
@@ -26,17 +28,18 @@ export function BottomNav() {
   return (
     <nav className="nav" aria-label="Main">
       {item('/', 'home', 'Home')}
+      {item('/campus', 'people', 'Campus', counts.campus)}
       <Link href="/post" aria-label="Post an item">
         <span className="plus"><Icon name="plus" size={24} stroke={2.4} /></span>
       </Link>
-      {item('/trades', 'chat', 'Trades')}
-      {item('/me', 'person', 'Me')}
+      {item('/trades', 'chat', 'Trades', counts.trades)}
+      {item('/me', 'person', 'Me', counts.me)}
     </nav>
   );
 }
 
-export function PushHeader({ title, subtitle, back, right }: {
-  title: string; subtitle?: string; back?: string; right?: React.ReactNode;
+export function PushHeader({ title, back, right }: {
+  title: string; back?: string; right?: React.ReactNode;
 }) {
   const router = useRouter();
   return (
@@ -44,10 +47,7 @@ export function PushHeader({ title, subtitle, back, right }: {
       <button className="icon-btn" aria-label="Back" onClick={() => (back ? router.push(back) : router.back())}>
         <Icon name="back" size={20} stroke={2.2} />
       </button>
-      <div className="grow">
-        <h1 className="title-push">{title}</h1>
-        {subtitle && <p className="subtitle">{subtitle}</p>}
-      </div>
+      <h1 className="title-push grow">{title}</h1>
       {right}
     </div>
   );

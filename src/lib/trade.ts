@@ -51,6 +51,7 @@ export type Offer = {
   id: string; listing_id: string; from_user: string; to_user: string; sweeteners: string[];
   suggested_spot: string | null; status: OfferStatus; meet_spot: string | null; meet_at: string | null;
   from_confirmed: boolean; to_confirmed: boolean; created_at: string;
+  awaiting: string | null; counter_count: number; countered_by: string | null;
   listing: Pick<Listing, 'id' | 'title' | 'tier' | 'category'> | null;
   from: Profile | null; to: Profile | null;
   items: { listing: Pick<Listing, 'id' | 'title' | 'tier'> | null }[];
@@ -63,6 +64,9 @@ export const OFFER_SELECT = `*,
   to:profiles!offers_to_user_fkey(id,first_name,last_initial),
   items:offer_items(listing:listings(id,title,tier))`;
 
+// Whose turn it is to answer a pending offer (starts with the owner; a counter passes it back)
+export const turnOf = (o: Offer) => o.awaiting ?? o.to_user;
+
 export function offerGives(o: Offer) {
   const things = o.items.map((i) => i.listing?.title).filter(Boolean) as string[];
   return [...things, ...o.sweeteners.map((s) => s.toLowerCase())].join(' + ');
@@ -73,7 +77,11 @@ export function friendlyError(e: unknown): string {
   const msg = (e as { message?: string })?.message ?? String(e);
   if (/Database error saving new user|upenn\.edu/i.test(msg)) return "Use your upenn.edu email so we know you're a student.";
   if (/row-level security/i.test(msg)) return "You don't have permission to do that.";
-  if (/rate limit|security purposes/i.test(msg)) return 'Too many tries. Wait a minute and try again.';
+  // Supabase: "For security purposes, you can only request this after 42 seconds."
+  const wait = msg.match(/after (\d+) seconds?/i);
+  if (wait) return `Your last code is still good. You can ask for a new one in ${wait[1]} seconds.`;
+  if (/email rate limit/i.test(msg)) return "We've sent a lot of codes this hour. Use the last code we sent, or try again in a few minutes.";
+  if (/rate limit|too many/i.test(msg)) return 'Lots of tries in a row. Give it a minute, then try again.';
   if (/expired|invalid|otp/i.test(msg)) return `That code didn't work. Check it, or send a new one. (${msg})`;
   return msg.replace(/^ERROR:\s*/, '');
 }

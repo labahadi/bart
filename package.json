@@ -6,11 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test:banned": "node --test src/lib/banned.test.mjs"
+    "test:banned": "node --experimental-strip-types --test src/lib/banned.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
+    "@types/qrcode": "^1.5.5",
     "next": "^15.5.29",
+    "qrcode": "^1.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },

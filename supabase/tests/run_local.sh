@@ -7,5 +7,12 @@ P="psql -v ON_ERROR_STOP=1 -q"
 $P -d postgres -c "drop database if exists bart_test" -c "create database bart_test"
 $P -d bart_test -f supabase/tests/supabase_stub.sql
 $P -d bart_test -f supabase/migrations/0001_core.sql
+$P -d bart_test -f supabase/migrations/0003_report_review.sql
+$P -d bart_test -f supabase/migrations/0004_counters_chat_photos.sql
+$P -d bart_test -f supabase/migrations/0005_handoff_codes.sql
+$P -d bart_test -f supabase/migrations/0006_lock_listings_in_trades.sql
+$P -d bart_test -f supabase/migrations/0007_campus_feed.sql
+$P -d bart_test -f supabase/migrations/0008_notifications.sql
+$P -d bart_test -f supabase/migrations/0009_safety.sql
 $P -d bart_test -f supabase/tests/grants_stub.sql
 $P -d bart_test -f supabase/tests/access_rules_test.sql

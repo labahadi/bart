@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase, getSafeSpots, type SafeSpot } from '@/lib/supabase';
-import { OFFER_SELECT, friendlyError, offerGives, type Offer } from '@/lib/trade';
+import { OFFER_SELECT, friendlyError, type Offer } from '@/lib/trade';
 import { Icon } from '@/components/Icon';
 import { Loading, PushHeader } from '@/components/ui';
 
@@ -11,7 +11,7 @@ const TZ = 'America/New_York';
 // Daytime only. 6 PM is listed but off: in Philadelphia it's dark by then for much of the school year.
 const SLOTS = [
   { h: 10, label: '10 AM' }, { h: 12, label: '12 PM' }, { h: 14, label: '2 PM' },
-  { h: 16, label: '4 PM' }, { h: 18, label: '6 PM · after dark', off: true },
+  { h: 16, label: '4 PM' }, { h: 18, label: 'After dark', off: true },
 ];
 
 // Philadelphia calendar date parts for a Date
@@ -82,7 +82,7 @@ export default function Meetup() {
   return (
     <>
       <main className="screen no-nav">
-        <PushHeader title="Set the meetup" subtitle={`${offer.listing?.title} ⇄ ${offerGives(offer)}`} back={`/trades/${id}`} />
+        <PushHeader title="Meetup" back={`/trades/${id}`} />
 
         <div>
           <p className="label">Day</p>
@@ -114,7 +114,6 @@ export default function Meetup() {
               );
             })}
           </div>
-          <p className="meta" style={{ margin: '8px 0 0' }}>Meetups are daytime only, for safety.</p>
         </div>
 
         <div>
@@ -125,7 +124,7 @@ export default function Meetup() {
                 onClick={() => setSpot(s.id)} role="radio" aria-checked={spot === s.id}>
                 <span className="radio" />
                 <span className="row-title grow">{s.name}</span>
-                <span className="meta">{s.walk_min} min walk</span>
+                <span className="meta">{s.walk_min} min</span>
               </button>
             ))}
           </div>
@@ -135,7 +134,7 @@ export default function Meetup() {
       </main>
       <div className="action-bar">
         <button className="btn pink" disabled={hour === null || !spot || busy} onClick={save}>
-          {hour === null ? 'Pick a time' : `Set meetup · ${day.wd} ${slotLabel} · ${spotName}`}
+          {hour === null ? 'Pick a time' : `${day.wd} ${slotLabel} · ${spotName}`}
         </button>
       </div>
     </>

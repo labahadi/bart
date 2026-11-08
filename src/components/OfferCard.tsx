@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { Icon } from './Icon';
 import { Avatar } from './ui';
-import { displayName, offerGives, type Offer } from '@/lib/trade';
+import { displayName, offerGives, turnOf, type Offer } from '@/lib/trade';
 
 export function statusPill(o: Offer, myId: string) {
-  const incoming = o.to_user === myId;
+  const myTurn = turnOf(o) === myId;
   switch (o.status) {
-    case 'pending': return incoming ? <span className="pill pink-tint">New offer</span> : <span className="pill soft">Waiting</span>;
+    case 'pending':
+      if (!myTurn) return <span className="pill soft">Waiting</span>;
+      return o.counter_count > 0 ? <span className="pill blue-tint">Countered</span> : <span className="pill pink-tint">New offer</span>;
     case 'accepted': return <span className="pill lime">Accepted</span>;
     case 'declined': return <span className="pill soft">Declined</span>;
     case 'cancelled': return <span className="pill soft">Cancelled</span>;
@@ -33,7 +35,7 @@ export function SwapRow({ offer, myId }: { offer: Offer; myId: string }) {
   );
 }
 
-export function OfferCard({ offer, myId, actions }: { offer: Offer; myId: string; actions?: React.ReactNode }) {
+export function OfferCard({ offer, myId, actions, unread }: { offer: Offer; myId: string; actions?: React.ReactNode; unread?: boolean }) {
   const other = offer.from_user === myId ? offer.to : offer.from;
   const when = new Date(offer.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return (
@@ -41,7 +43,10 @@ export function OfferCard({ offer, myId, actions }: { offer: Offer; myId: string
       <Link href={`/trades/${offer.id}`} className="row" style={{ color: 'inherit' }}>
         <Avatar profile={other} size={40} />
         <div className="grow">
-          <div style={{ fontSize: 15, fontWeight: 600 }}>{displayName(other)}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {displayName(other)}
+            {unread && <span aria-label="New" style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--pink)' }} />}
+          </div>
           <div className="meta">{when}</div>
         </div>
         {statusPill(offer, myId)}

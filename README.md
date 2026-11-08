@@ -99,9 +99,54 @@ npm run test:banned
 
 ---
 
+## Newer features: setup
+
+Run each of these once in the Supabase **SQL Editor**, in order, after 0001–0003:
+
+| File | Adds |
+|---|---|
+| `0004_counters_chat_photos.sql` | **Counter offers** (Decline / Counter / Accept, back and forth up to 6 times) and **photos in chat** (private: only the two people in the trade can see them) |
+| `0005_handoff_codes.sql` | **Finishing a trade in person.** One person taps *Show my code* (a QR code plus 4 digits, valid 10 minutes). The other scans it with their phone camera or types the digits. After 5 wrong tries the code locks and a new one is needed. |
+| `0006_lock_listings_in_trades.sql` | Owners can **edit their listings**, but not once an item is in a trade |
+| `0007_campus_feed.sql` | The **Campus tab**: share a finished trade to the feed, likes, comments, **Trade of the Week** (most likes since Monday, ties go to the earlier post), and the **ISO board** ("I have this" points to an item in your closet; only the person who posted sees who answered) |
+| `0008_notifications.sql` | **Notifications**: number badges on the Campus, Trades and Me tabs, a dot on trades with something new, and an Activity list behind the bell on Home. Created by the database for offers, counters, answers, messages, meetups, finished trades, likes, comments, ISO answers, and saved items being traded or taken down. Repeats collapse into one. |
+| `0009_safety.sql` | **Keeping sexual content out.** Sexual words are blocked everywhere (chat, comments, names, notes, listings), including disguises like "s3xy" or "nuuudes". Phones can no longer upload photos directly: every photo goes through the server, which checks it with AI first (see below). Adds **Report chat** (flag in the chat header) and a **Chats** section on the Reports screen where reviewers read the conversation and delete messages. |
+
+Then run `npm install` again (the QR code feature added a package).
+
+**AI fairness check (optional).** On the offer and counter screens, "Ask AI if this is fair" sends both sides' titles, details and first photos to Claude and shows a one-line second opinion. It never blocks an offer. To turn it on:
+1. Create an API key at [console.anthropic.com](https://console.anthropic.com) and add a few dollars of credit. Each check costs a fraction of a cent.
+2. Add it to `.env.local` (and to Vercel's Environment Variables): `ANTHROPIC_API_KEY=sk-ant-...`
+3. Restart `npm run dev`.
+
+Without a key, the button simply doesn't appear. The key stays on the server and never reaches anyone's phone.
+
+### Photo safety check (required for photos)
+
+After running `0009_safety.sql`, photos only work once the server has two keys. Add both to `.env.local` (and to Vercel's Environment Variables), then restart `npm run dev`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+- `ANTHROPIC_API_KEY`: from [console.anthropic.com](https://console.anthropic.com). The same key turns on the AI fairness check. Each photo check costs a fraction of a cent.
+- `SUPABASE_SERVICE_ROLE_KEY`: Supabase → Project Settings → API Keys → the **service_role** key (or **Secret key**). This key can do anything in your database, so it must only ever go in `.env.local` and Vercel, never in a file whose name starts with `NEXT_PUBLIC_`, never in GitHub, never in a text to anyone.
+
+If either key is missing, photo uploads are switched off rather than allowed through unchecked. Blocked attempts are recorded; see who has tried with:
+```sql
+select p.first_name, b.kind, b.category, b.created_at from photo_blocks b join profiles p on p.id = b.user_id order by b.created_at desc;
+```
+
+To add more blocked words (for example slurs), add rows to `banned_terms` with `everywhere = true`, and the same words to `EVERYWHERE` in `src/lib/banned.ts`.
+
 ## Running the beta
 
-**Reviewing reports.** In Supabase, open **Table Editor → reports**. To restore a listing that three reports hid, open **listings**, set its `status` back to `active`, and set `reviewed = true` on its reports.
+**Reviewing reports.** Run `supabase/migrations/0003_report_review.sql` in the SQL Editor once. Then make each teammate a reviewer (after they've signed up in the app):
+```sql
+insert into reviewers (user_id) select id from auth.users where email = 'them@wharton.upenn.edu';
+```
+Reviewers see **Review reports** on their Me tab. Each reported listing shows its photos, description, who posted it, every reason and note, and whether that person has been reported before, with **Keep it up** and **Take it down** buttons. Reporters stay anonymous, even to reviewers.
 
 **Changing the Safe Spots.** Edit the `safe_spots` table in the Table Editor. The app picks up changes automatically.
 
@@ -123,7 +168,6 @@ select status, count(*) from offers group by status;                 -- offers b
 - **Name at sign-up.** The spec shows "Jordan L." on item pages but never collects a name, so step 3 asks for a first name and last initial. Names never appear on feed cards.
 - **6 PM is off.** The spec allows 6 PM, but in Philadelphia it's dark by about 5 PM from November to February. Slots run 10 AM to 4 PM. If you want 6 PM back in spring, change it in `set_meetup` (SQL) and `SLOTS` (meetup page).
 - **Banned words match whole words.** The spec says "substring," but substring matching blocks "in*credible* condition" (edible) and "be*gun*". Whole words plus plurals fixes that, and "vapes" and "answer keys" are still caught.
-- **"Counter" became "Message".** Countering needs a back-and-forth offer flow. For the beta, the owner can message the sender from the inbox and they can send a new offer.
 - **"Ask" before an offer isn't there yet.** Chat lives inside a trade, which keeps all messages tied to a real offer and easy to moderate.
 - **Skill counts as M** on the fairness meter, and the meter compares against the item you're asking for (the spec's example only covered M).
 - **No walking times on cards.** Walking times need people's locations, which the beta doesn't collect. Safe Spots still show walking times.
@@ -131,4 +175,4 @@ select status, count(*) from offers group by status;                 -- offers b
 
 ## Deliberately not built yet
 
-Perfect matches, the campus map, Campus feed, Trade of the Week, badges, streaks, notifications and push, phone verification, blocking users, calendar invites (a Google Calendar link is there instead), and the counter-offer flow.
+Perfect matches, the campus map, the challenge bar, badges, streaks, notifications and push, phone verification, blocking users, reporting a chat photo, and calendar invites (a Google Calendar link is there instead).

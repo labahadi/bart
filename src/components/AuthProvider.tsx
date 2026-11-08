@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { Loading } from './ui';
+import { NotificationsProvider } from './Notifications';
 
 type Me = { id: string; first_name: string | null; last_initial: string | null; rules_accepted_at: string | null };
 type AuthState = { session: Session | null; me: Me | null; ready: boolean; refresh: () => Promise<void> };
@@ -45,10 +46,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Signed out, or hasn't agreed to the house rules yet -> sign-up flow
   const needsLogin = ready && !PUBLIC.includes(path) && (!session || !me?.rules_accepted_at);
-  useEffect(() => { if (needsLogin) router.replace('/login'); }, [needsLogin, router]);
+  // Keep any #error=... from an email link so the sign-up screen can explain it
+  useEffect(() => {
+    if (!needsLogin) return;
+    // Remember where they were going (e.g. a scanned QR code) so sign-in can bring them back
+    try { if (path !== '/') sessionStorage.setItem('bart-next', path + window.location.search); } catch {}
+    router.replace('/login' + (window.location.hash.includes('error') ? window.location.hash : ''));
+  }, [needsLogin, router, path]);
 
   const refresh = useCallback(async () => { await loadProfile(session); }, [loadProfile, session]);
 
   if (!ready || needsLogin) return <Loading />;
-  return <AuthContext.Provider value={{ session, me, ready, refresh }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ session, me, ready, refresh }}>
+      <NotificationsProvider userId={me?.rules_accepted_at ? me.id : null}>{children}</NotificationsProvider>
+    </AuthContext.Provider>
+  );
 }

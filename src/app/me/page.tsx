@@ -8,6 +8,7 @@ import { displayName, type Listing } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Avatar, BottomNav } from '@/components/ui';
+import { useNotifications } from '@/components/Notifications';
 
 const STATUS_LABEL: Record<Listing['status'], string> = {
   active: 'Live', in_trade: 'In a trade', traded: 'Traded', removed: 'Taken down',
@@ -15,11 +16,14 @@ const STATUS_LABEL: Record<Listing['status'], string> = {
 
 export default function Me() {
   const { me } = useAuth();
+  const { counts, markRead } = useNotifications();
+  useEffect(() => { if (counts.me) markRead({ tab: 'me' }); }, [counts.me, markRead]);
   const router = useRouter();
   const [tab, setTab] = useState<'closet' | 'saved'>('closet');
   const [closet, setCloset] = useState<Listing[]>([]);
   const [saved, setSaved] = useState<Listing[]>([]);
   const [stats, setStats] = useState<{ rating: number | null; trades: number } | null>(null);
+  const [reviewer, setReviewer] = useState(false);
 
   useEffect(() => {
     if (!me) return;
@@ -28,6 +32,7 @@ export default function Me() {
     supabase.from('saves').select('listing:listings(*)').order('created_at', { ascending: false })
       .then(({ data }) => setSaved(((data ?? []) as unknown as { listing: Listing | null }[]).map((s) => s.listing).filter(Boolean) as Listing[]));
     supabase.rpc('trader_stats', { p_user: me.id }).then(({ data }) => setStats(data?.[0] ?? null));
+    supabase.rpc('is_reviewer').then(({ data }) => setReviewer(data === true));
   }, [me]);
 
   async function signOut() {
@@ -63,7 +68,7 @@ export default function Me() {
         {traded > 0 && (
           <div className="row" style={{ background: 'var(--green-tint)', borderRadius: 14, padding: '12px 14px', fontSize: 14, gap: 10 }}>
             <Icon name="check" size={20} />
-            <span><b>{traded} item{traded === 1 ? '' : 's'}</b> kept out of the trash by your trades</span>
+            <span><b>{traded} item{traded === 1 ? '' : 's'}</b> kept out of the trash</span>
           </div>
         )}
 
@@ -74,7 +79,7 @@ export default function Me() {
 
         {rows.length === 0 && (
           <div className="empty">
-            {tab === 'closet' ? <>Nothing listed yet. <Link href="/post">Post your first item</Link></> : 'Tap the heart on an item to save it here.'}
+            {tab === 'closet' ? <Link href="/post">Post your first item</Link> : 'Nothing saved yet.'}
           </div>
         )}
         <div className="stack" style={{ gap: 8 }}>
@@ -86,6 +91,13 @@ export default function Me() {
             </Link>
           ))}
         </div>
+
+        {reviewer && (
+          <Link href="/admin/reports" className="spread card" style={{ color: 'var(--ink)' }}>
+            <span className="row" style={{ gap: 10, fontWeight: 600, fontSize: 14 }}><Icon name="flag" size={20} /> Review reports</span>
+            <span className="meta">›</span>
+          </Link>
+        )}
 
         <button className="text-btn" style={{ color: 'var(--muted)', alignSelf: 'center', display: 'flex', gap: 6, alignItems: 'center' }} onClick={signOut}>
           <Icon name="logout" size={18} /> Sign out

@@ -3,15 +3,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { OFFER_SELECT, friendlyError, type Offer } from '@/lib/trade';
+import { OFFER_SELECT, friendlyError, turnOf, type Offer } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { OfferCard } from '@/components/OfferCard';
 import { BottomNav } from '@/components/ui';
+import { useNotifications } from '@/components/Notifications';
 
 type Tab = 'incoming' | 'sent' | 'done';
 
 export default function Trades() {
   const { me } = useAuth();
+  const { unreadRefs } = useNotifications();
   const [tab, setTab] = useState<Tab>('incoming');
   const [offers, setOffers] = useState<Offer[] | null>(null);
   const [error, setError] = useState('');
@@ -45,7 +47,8 @@ export default function Trades() {
   const incoming = (offers ?? []).filter((o) => o.to_user === me.id && o.status !== 'completed');
   const sent = (offers ?? []).filter((o) => o.from_user === me.id && o.status !== 'completed');
   const done = (offers ?? []).filter((o) => o.status === 'completed');
-  const pendingCount = incoming.filter((o) => o.status === 'pending').length;
+  const pendingCount = incoming.filter((o) => o.status === 'pending' && turnOf(o) === me.id).length;
+  const sentTurns = sent.filter((o) => o.status === 'pending' && turnOf(o) === me.id).length;
   const list = tab === 'incoming' ? incoming : tab === 'sent' ? sent : done;
 
   return (
@@ -56,28 +59,28 @@ export default function Trades() {
           <button className={tab === 'incoming' ? 'on' : ''} onClick={() => setTab('incoming')}>
             Incoming{pendingCount ? ` (${pendingCount})` : ''}
           </button>
-          <button className={tab === 'sent' ? 'on' : ''} onClick={() => setTab('sent')}>Sent</button>
+          <button className={tab === 'sent' ? 'on' : ''} onClick={() => setTab('sent')}>Sent{sentTurns ? ` (${sentTurns})` : ''}</button>
           <button className={tab === 'done' ? 'on' : ''} onClick={() => setTab('done')}>Done</button>
         </div>
         {error && <div className="alert">{error}</div>}
         {!offers && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
         {offers && list.length === 0 && (
           <div className="empty">
-            {tab === 'incoming' ? 'No offers yet. Offers on your listings show up here.'
-              : tab === 'sent' ? <>You haven&apos;t sent any offers. <Link href="/">Browse the feed</Link></>
-              : 'Completed trades show up here.'}
+            {tab === 'incoming' ? 'No offers yet.' : tab === 'sent' ? <Link href="/">Browse the feed</Link> : 'No trades yet.'}
           </div>
         )}
         {list.map((o) => (
-          <OfferCard key={o.id} offer={o} myId={me.id} actions={
-            o.status === 'pending' && o.to_user === me.id ? (
-              <div className="row" style={{ gap: 8 }}>
-                <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }}
-                  disabled={busyId === o.id} onClick={() => respond(o.id, 'decline')}>Decline</button>
-                <Link href={`/trades/${o.id}`} className="btn small" style={{ background: 'var(--surface)', color: 'var(--blue)', border: '1.5px solid var(--blue)' }}>
-                  Message
-                </Link>
-                <button className="btn small" disabled={busyId === o.id} onClick={() => respond(o.id, 'accept')}>Accept</button>
+          <OfferCard key={o.id} offer={o} myId={me.id} unread={unreadRefs.has(o.id)} actions={
+            o.status === 'pending' && turnOf(o) === me.id ? (
+              <div className="stack" style={{ gap: 6 }}>
+                <div className="row" style={{ gap: 8 }}>
+                  <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }}
+                    disabled={busyId === o.id} onClick={() => respond(o.id, 'decline')}>Decline</button>
+                  <Link href={`/trades/${o.id}/counter`} className="btn small" style={{ background: 'var(--surface)', color: 'var(--blue)', border: '1.5px solid var(--blue)' }}>
+                    Counter
+                  </Link>
+                  <button className="btn small" disabled={busyId === o.id} onClick={() => respond(o.id, 'accept')}>Accept</button>
+                </div>
               </div>
             ) : o.status === 'pending' && o.from_user === me.id ? (
               <button className="text-btn" style={{ alignSelf: 'flex-start', padding: 0, color: 'var(--muted)' }}
@@ -85,7 +88,7 @@ export default function Trades() {
             ) : o.status === 'accepted' ? (
               <Link href={`/trades/${o.id}`} className="btn pink small">Open chat + set meetup</Link>
             ) : o.status === 'declined' ? (
-              <p className="meta" style={{ margin: 0 }}>Declined. {o.from_user === me.id ? 'Try another item on the feed.' : "They'll get a friendly heads up."}</p>
+              <p className="meta" style={{ margin: 0 }}>Declined</p>
             ) : null
           } />
         ))}

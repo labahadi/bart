@@ -4,12 +4,23 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { friendlyError } from '@/lib/trade';
+import { blockedAnywhere } from '@/lib/banned';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Logo } from '@/components/ui';
 
 // Penn addresses, including school subdomains like wharton.upenn.edu
 const isPennEmail = (e: string) => /^[^@\s]+@([a-z0-9-]+\.)*upenn\.edu$/i.test(e.trim());
+
+// Where to go after signing in: back to the page they came from (only paths inside bart)
+function takeNext() {
+  try {
+    const next = sessionStorage.getItem('bart-next');
+    sessionStorage.removeItem('bart-next');
+    if (next && next.startsWith('/') && !next.startsWith('//')) return next;
+  } catch {}
+  return '/';
+}
 
 const RULES = [
   ['No exams, answer keys or graded work', "Tutoring is fine. Doing someone's homework isn't."],
@@ -30,10 +41,29 @@ export default function SignUp() {
   const [agreed, setAgreed] = useState([false, false, false, false]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [note, setNote] = useState('');
+  // Seconds until another code can be requested (Supabase allows one per email every 60s)
+  const [cooldown, setCooldown] = useState(0);
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  // Coming back from an email link that failed (e.g. #error_code=otp_expired): say why
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.slice(1) || window.location.search.slice(1));
+    const code = params.get('error_code');
+    if (!code && !params.get('error')) return;
+    setError(code === 'otp_expired'
+      ? "That sign-in link already expired or was used. Penn's email scanner sometimes opens links before you do. Send a new one, or use the 6-digit code if your email has one."
+      : `Sign-in link didn't work: ${params.get('error_description')?.replace(/\+/g, ' ') ?? code}`);
+    window.history.replaceState(null, '', '/login');
+  }, []);
 
   // Already signed in: finish the house rules, or go to the feed
   useEffect(() => {
-    if (session && me?.rules_accepted_at) router.replace('/');
+    if (session && me?.rules_accepted_at) router.replace(takeNext());
     else if (session && me) setStep(3);
   }, [session, me, router]);
 
@@ -42,10 +72,19 @@ export default function SignUp() {
   async function sendCode() {
     setTouched(true);
     if (!isPennEmail(email)) return;
-    setBusy(true); setError('');
+    setBusy(true); setError(''); setNote('');
     const { error } = await supabase.auth.signInWithOtp({ email: email.trim().toLowerCase() });
     setBusy(false);
-    if (error) setError(friendlyError(error)); else setStep(2);
+    if (!error) { setStep(2); setCooldown(60); return; }
+    // Asked again too soon: the last code was already sent, so go to the code screen instead of erroring
+    const wait = error.message.match(/after (\d+) seconds?/i);
+    if (wait) {
+      setCooldown(Number(wait[1]));
+      setStep(2);
+      setNote('We already sent you a code. Use the newest email.');
+      return;
+    }
+    setError(friendlyError(error));
   }
 
   async function verify() {
@@ -61,11 +100,11 @@ export default function SignUp() {
     const { error } = await supabase.rpc('complete_signup', { p_first_name: first, p_last_initial: lastInitial });
     if (error) { setBusy(false); setError(friendlyError(error)); return; }
     await refresh();
-    router.replace('/');
+    router.replace(takeNext());
   }
 
   const allAgreed = agreed.every(Boolean);
-  const nameOk = first.trim().length >= 1 && /^[a-z]$/i.test(lastInitial.trim());
+  const nameOk = first.trim().length >= 1 && /^[a-z]$/i.test(lastInitial.trim()) && !blockedAnywhere(first);
 
   return (
     <main style={{ padding: '40px 24px 40px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: '100dvh' }}>
@@ -123,12 +162,12 @@ export default function SignUp() {
           <button className="btn" disabled={code.length < 6 || busy} onClick={verify}>
             {busy ? 'Checking…' : 'Verify'}
           </button>
-          <p className="meta" style={{ textAlign: 'center' }}>
-            Can&apos;t find it? Check your spam or quarantine folder.
-          </p>
           <div className="row" style={{ justifyContent: 'center', gap: 4 }}>
-            <button className="text-btn" onClick={() => { setStep(1); setCode(''); setError(''); }}>Use a different email</button>
-            <button className="text-btn" onClick={sendCode} disabled={busy}>Send a new code</button>
+            <button className="text-btn" onClick={() => { setStep(1); setCode(''); setError(''); setNote(''); }}>Use a different email</button>
+            <button className="text-btn" onClick={sendCode} disabled={busy || cooldown > 0}
+              style={cooldown > 0 ? { color: 'var(--muted)' } : undefined}>
+              {cooldown > 0 ? `Send a new code in ${cooldown}s` : 'Send a new code'}
+            </button>
           </div>
         </>
       )}
@@ -141,7 +180,7 @@ export default function SignUp() {
             </span>
             <div>
               <div className="display" style={{ fontSize: 22 }}>You&apos;re verified</div>
-              <div className="meta" style={{ fontSize: 13 }}>One last thing: your name and the house rules</div>
+              <div className="meta" style={{ fontSize: 13 }}>One last thing</div>
             </div>
           </div>
           <div className="row" style={{ alignItems: 'flex-end' }}>
@@ -156,7 +195,6 @@ export default function SignUp() {
                 value={lastInitial} onChange={(e) => setLastInitial(e.target.value.replace(/[^a-z]/gi, '').toUpperCase())} />
             </div>
           </div>
-          <p className="meta" style={{ marginTop: -8 }}>People you trade with see &quot;{first || 'Jordan'} {lastInitial || 'L'}.&quot; Never on the feed.</p>
           <div className="stack" style={{ gap: 10 }}>
             {RULES.map(([title, sub], i) => (
               <button key={title} className={`check-row ${agreed[i] ? 'on' : ''}`}
@@ -172,6 +210,7 @@ export default function SignUp() {
         </>
       )}
 
+      {note && !error && <div className="toast">{note}</div>}
       {error && <div className="alert"><Icon name="warning" size={18} />{error}</div>}
     </main>
   );

@@ -6,9 +6,12 @@ import { CATEGORIES, type Category, type Listing } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { BottomNav, ListingCard, Logo } from '@/components/ui';
+import Link from 'next/link';
+import { useNotifications } from '@/components/Notifications';
 
 export default function Home() {
   const { me } = useAuth();
+  const { counts } = useNotifications();
   const [category, setCategory] = useState<Category | 'all'>('all');
   const [query, setQuery] = useState('');
   const [listings, setListings] = useState<Listing[] | null>(null);
@@ -40,6 +43,10 @@ export default function Home() {
               <Icon name="shield" size={14} /> Penn verified
             </span>
           </div>
+          <Link href="/activity" className="icon-btn" aria-label="Activity" style={{ position: 'relative' }}>
+            <Icon name="bell" size={20} />
+            {counts.all > 0 && <span style={{ position: 'absolute', top: 9, right: 10, width: 9, height: 9, borderRadius: 999, background: 'var(--pink)', border: '2px solid #fff', boxSizing: 'content-box' }} />}
+          </Link>
         </div>
 
         <label className="search">
@@ -66,7 +73,7 @@ export default function Home() {
         {!listings && !error && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
         {listings && listings.length === 0 && (
           <div className="empty">
-            {query || category !== 'all' ? 'Nothing matches yet. Try another search.' : 'No listings yet. Be the first: tap + to post something.'}
+            {query || category !== 'all' ? 'No matches.' : 'Nothing here yet.'}
           </div>
         )}
         {listings && listings.length > 0 && (
