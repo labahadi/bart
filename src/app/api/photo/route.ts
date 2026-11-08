@@ -36,6 +36,9 @@ export async function POST(req: Request) {
   const userId = who?.user?.id;
   if (!userId) return NextResponse.json({ error: 'Sign in first.' }, { status: 401 });
 
+  const { data: paused } = await asUser.rpc('is_suspended', { p_user: userId });
+  if (paused === true) return NextResponse.json({ error: 'Your account is paused, so you can\'t send photos right now.' }, { status: 403 });
+
   const form = await req.formData().catch(() => null);
   const file = form?.get('file');
   const kind = form?.get('kind') === 'chat' ? 'chat' : 'listing';

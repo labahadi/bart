@@ -27,14 +27,14 @@ const ago = (iso: string) => {
 };
 
 export default function ReportQueue() {
-  const [tab, setTab] = useState<'open' | 'chats' | 'all'>('open');
+  const [tab, setTab] = useState<'open' | 'chats' | 'paused' | 'all'>('open');
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [done, setDone] = useState('');
 
   const load = useCallback(async () => {
-    if (tab === 'chats') return;
+    if (tab === 'chats' || tab === 'paused') return;
     const { data, error } = await supabase.rpc('report_queue', { p_include_reviewed: tab === 'all' });
     if (error) setError(friendlyError(error)); else { setError(''); setRows(data as Row[]); }
   }, [tab]);
@@ -56,22 +56,24 @@ export default function ReportQueue() {
 
       <div className="segmented">
         <button className={tab === 'open' ? 'on' : ''} onClick={() => setTab('open')}>
-          Listings{rows && tab === 'open' ? ` (${rows.length})` : ''}
+          Listings
         </button>
         <button className={tab === 'chats' ? 'on' : ''} onClick={() => setTab('chats')}>Chats</button>
+        <button className={tab === 'paused' ? 'on' : ''} onClick={() => setTab('paused')}>Paused</button>
         <button className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>All</button>
       </div>
 
       {tab === 'chats' && <ChatReports />}
+      {tab === 'paused' && <PausedAccounts />}
 
       {done && <div className="toast">{done}</div>}
       {error && <div className="alert"><Icon name="warning" size={18} />{error}</div>}
-      {tab !== 'chats' && !rows && !error && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
-      {tab !== 'chats' && rows && rows.length === 0 && (
+      {(tab === 'open' || tab === 'all') && !rows && !error && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
+      {(tab === 'open' || tab === 'all') && rows && rows.length === 0 && (
         <div className="empty">{tab === 'open' ? 'All clear.' : 'No reports yet.'}</div>
       )}
 
-      {tab !== 'chats' && rows?.map((r) => {
+      {(tab === 'open' || tab === 'all') && rows?.map((r) => {
         const hidden = r.listing_status === 'removed';
         return (
           <div key={r.listing_id} className="card big stack" style={{ gap: 12 }}>
@@ -135,6 +137,9 @@ export default function ReportQueue() {
               </div>
             )}
             {!hidden && <Link href={`/item/${r.listing_id}`} className="meta-blue">Open listing ›</Link>}
+            <PauseControl name={r.owner_name}
+              loadCount={() => supabase.rpc('listing_owner_pauses', { p_listing: r.listing_id }).then(({ data }) => (data as number) ?? 0)}
+              pause={(days, reason) => supabase.rpc('pause_listing_owner', { p_listing: r.listing_id, p_days: days, p_reason: reason })} />
           </div>
         );
       })}
@@ -216,7 +221,105 @@ function ChatReports() {
               </div>
             ))}
           </div>
+          <PauseControl name={r.other_name}
+            loadCount={() => supabase.rpc('pause_count', { p_user: r.other_id }).then(({ data }) => (data as number) ?? 0)}
+            pause={(days, reason) => supabase.rpc('pause_account', { p_user: r.other_id, p_days: days, p_reason: reason })} />
           <button className="btn small ink" onClick={() => done(r.report_id)}>Done</button>
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pausing accounts
+// ---------------------------------------------------------------------------
+const LENGTHS: { days: number | null; label: string }[] = [
+  { days: 1, label: '1 day' }, { days: 3, label: '3 days' }, { days: 7, label: '7 days' }, { days: null, label: 'Until further notice' },
+];
+
+function PauseControl({ name, loadCount, pause }: {
+  name: string;
+  loadCount: () => PromiseLike<number>;
+  pause: (days: number | null, reason: string) => PromiseLike<{ error: unknown }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [past, setPast] = useState<number | null>(null);
+  const [days, setDays] = useState<number | null | undefined>(undefined);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => { loadCount().then(setPast); }, [loadCount]);
+
+  async function confirm() {
+    setBusy(true); setMsg('');
+    const { error } = await pause(days ?? null, reason.trim());
+    setBusy(false);
+    if (error) setMsg(friendlyError(error));
+    else { setMsg(`${name} is paused`); setOpen(false); setPast((p) => (p ?? 0) + 1); }
+  }
+
+  return (
+    <div className="stack" style={{ gap: 8 }}>
+      <div className="spread">
+        <span className="meta">{past ? `Paused ${past} time${past > 1 ? 's' : ''} before` : 'Never paused'}</span>
+        {!open && <button className="text-btn" style={{ padding: 0, color: 'var(--error)' }} onClick={() => setOpen(true)}>Pause {name}</button>}
+      </div>
+      {open && (
+        <div className="stack" style={{ gap: 8, background: 'var(--bg)', borderRadius: 12, padding: 10 }}>
+          <div className="chips wrap">
+            {LENGTHS.map((l) => (
+              <button key={l.label} className={`chip ${days === l.days ? 'on' : ''}`} onClick={() => setDays(l.days)}>{l.label}</button>
+            ))}
+          </div>
+          <input className="input" style={{ height: 44 }} placeholder="Reason (they'll see this)" maxLength={300}
+            value={reason} onChange={(e) => setReason(e.target.value)} />
+          <div className="row" style={{ gap: 8 }}>
+            <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }} onClick={() => setOpen(false)}>Cancel</button>
+            <button className="btn small pink" disabled={days === undefined || reason.trim().length < 3 || busy} onClick={confirm}>Pause</button>
+          </div>
+        </div>
+      )}
+      {msg && <span className="meta" style={{ fontWeight: 600 }}>{msg}</span>}
+    </div>
+  );
+}
+
+type Paused = { user_id: string; name: string; until: string | null; reason: string; past_pauses: number };
+
+function PausedAccounts() {
+  const [rows, setRows] = useState<Paused[] | null>(null);
+  const [error, setError] = useState('');
+  const load = useCallback(async () => {
+    const { data, error } = await supabase.rpc('paused_accounts');
+    if (error) setError(friendlyError(error)); else setRows((data ?? []) as Paused[]);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function lift(userId: string) {
+    const { error } = await supabase.rpc('lift_pause', { p_user: userId });
+    if (error) setError(friendlyError(error)); else load();
+  }
+
+  if (error) return <div className="alert">{error}</div>;
+  if (!rows) return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>;
+  if (rows.length === 0) return <div className="empty">Nobody is paused.</div>;
+  return (
+    <>
+      {rows.map((p) => (
+        <div key={p.user_id + (p.until ?? '')} className="card stack" style={{ gap: 6 }}>
+          <div className="spread">
+            <span style={{ fontSize: 15, fontWeight: 700 }}>{p.name}</span>
+            <span className="meta">
+              {p.until ? `Until ${new Date(p.until).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric' })}` : 'Until further notice'}
+            </span>
+          </div>
+          <p className="body" style={{ fontSize: 13 }}>{p.reason}</p>
+          <div className="spread">
+            <span className="meta">{p.past_pauses} pause{p.past_pauses > 1 ? 's' : ''} total</span>
+            <button className="text-btn" style={{ padding: 0 }} onClick={() => lift(p.user_id)}>Lift pause</button>
+          </div>
         </div>
       ))}
     </>

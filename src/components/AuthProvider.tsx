@@ -20,6 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [ready, setReady] = useState(false);
+  const [pausedUntil, setPausedUntil] = useState<string | null | undefined>(undefined); // undefined = not paused
   const router = useRouter();
   const path = usePathname();
 
@@ -28,6 +29,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await supabase.from('profiles')
       .select('id,first_name,last_initial,rules_accepted_at').eq('id', s.user.id).single();
     setMe(data ?? null);
+    // Is this account paused right now?
+    const { data: pauses } = await supabase.from('suspensions').select('until,lifted_at')
+      .is('lifted_at', null).order('created_at', { ascending: false }).limit(5);
+    const active = ((pauses ?? []) as { until: string | null }[]).find((x) => !x.until || new Date(x.until) > new Date());
+    setPausedUntil(active ? (active.until ?? null) : undefined);
   }, []);
 
   useEffect(() => {
@@ -59,7 +65,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   if (!ready || needsLogin) return <Loading />;
   return (
     <AuthContext.Provider value={{ session, me, ready, refresh }}>
-      <NotificationsProvider userId={me?.rules_accepted_at ? me.id : null}>{children}</NotificationsProvider>
+      <NotificationsProvider userId={me?.rules_accepted_at ? me.id : null}>
+        {pausedUntil !== undefined && session && (
+          <div style={{ position: 'sticky', top: 0, zIndex: 30, background: 'var(--ink)', color: '#fff', padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>
+            Your account is paused {pausedUntil
+              ? `until ${new Date(pausedUntil).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+              : 'until further notice'}. You can still read your chats.
+          </div>
+        )}
+        {children}
+      </NotificationsProvider>
     </AuthContext.Provider>
   );
 }

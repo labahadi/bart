@@ -412,6 +412,37 @@ select t.expect('reviewer can delete a message', not exists (select 1 from messa
 select resolve_chat_report((select report_id from chat_report_queue() limit 1));
 select t.expect('resolved chat reports leave the queue', not exists (select 1 from chat_report_queue()));
 
+-- Pausing accounts (Jordan, b, is a reviewer)
+select t.as_user('00000000-0000-0000-0000-00000000000c');
+select t.expect_error('non-reviewer cannot pause', $$select pause_account('00000000-0000-0000-0000-00000000000a', 1, 'test')$$, 'reviewers');
+reset role;
+insert into listings (id, owner_id, title) values ('60000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000c', 'Lamp shade');
+set role authenticated;
+select t.as_user('00000000-0000-0000-0000-00000000000b');
+select t.expect_error('reviewer cannot pause themselves', $$select pause_account('00000000-0000-0000-0000-00000000000b', 1, 'test')$$, 'yourself');
+select t.expect_error('only 1, 3 or 7 days', $$select pause_account('00000000-0000-0000-0000-00000000000c', 2, 'test')$$, '1, 3 or 7');
+select pause_listing_owner('60000000-0000-0000-0000-000000000001', 3, 'Sent sexual messages');
+select t.expect('paused person shows in the list', exists (select 1 from paused_accounts() where name = 'Riley K.' and past_pauses = 1));
+select t.expect('paused person''s listings are hidden', not exists (select 1 from listings where id = '60000000-0000-0000-0000-000000000001'));
+select t.as_user('00000000-0000-0000-0000-00000000000c');
+select t.expect('paused person is told why', exists (select 1 from notifications where kind = 'paused' and body like 'Your account is paused until % Reason: Sent sexual messages'));
+select t.expect('paused person still sees own listing', exists (select 1 from listings where id = '60000000-0000-0000-0000-000000000001'));
+select t.expect('paused person sees own pause', exists (select 1 from suspensions));
+select t.expect_error('paused: cannot post', $$insert into listings (title) values ('Bike')$$, 'paused');
+select t.expect_error('paused: cannot offer',
+  $$select create_offer('50000000-0000-0000-0000-000000000001', array['60000000-0000-0000-0000-000000000001']::uuid[], '{}', 'van-pelt')$$, 'paused');
+select t.expect_error('paused: cannot comment', $$insert into post_comments (post_id, body) select post_id, 'hi' from post1$$, 'paused');
+select t.expect_error('paused: cannot like', $$insert into post_likes (post_id) select post_id from post1$$, 'paused');
+select t.expect_error('paused: cannot post to ISO', $$insert into iso_posts (want) values ('Bike')$$, 'paused');
+select t.as_user('00000000-0000-0000-0000-00000000000b');
+select lift_pause('00000000-0000-0000-0000-00000000000c');
+select t.expect('lifting a pause shows listings again', exists (select 1 from listings where id = '60000000-0000-0000-0000-000000000001'));
+select t.expect('history counts past pauses', pause_count('00000000-0000-0000-0000-00000000000c') = 1);
+select t.as_user('00000000-0000-0000-0000-00000000000c');
+insert into listings (title) values ('Bike after pause');
+select t.expect('unpaused person can post again', exists (select 1 from listings where title = 'Bike after pause'));
+select t.expect('non-reviewer sees 0 pause history for others', pause_count('00000000-0000-0000-0000-00000000000a') = 0);
+
 reset role;
 \o
 select case when ok then 'PASS' else 'FAIL' end as result, name, case when not ok then detail end as detail
