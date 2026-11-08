@@ -19,13 +19,25 @@ export function statusPill(o: Offer, myId: string) {
 }
 
 // The two sides of a trade, from my point of view
+// Tapping an item name opens that item's listing (photos, notes, condition)
 export function SwapRow({ offer, myId }: { offer: Offer; myId: string }) {
   const iSent = offer.from_user === myId;
-  const gives = offerGives(offer);
-  const gets = offer.listing?.title ?? 'Item';
   const done = offer.status === 'completed';
-  const left = iSent ? { k: done ? 'You gave' : 'You give', v: gives } : { k: done ? 'They gave' : 'They give', v: gives };
-  const right = iSent ? { k: done ? 'You got' : 'For their', v: gets } : { k: done ? 'You gave' : 'For your', v: gets };
+  const offered = offer.items.map((i) => i.listing).filter(Boolean) as { id: string; title: string }[];
+  const link = (it: { id: string; title: string }) => (
+    <Link key={it.id} href={`/item/${it.id}`} style={{ color: 'var(--ink)', textDecoration: 'underline', textDecorationColor: 'var(--border)', textUnderlineOffset: 3 }}>
+      {it.title}
+    </Link>
+  );
+  const givesNode = (
+    <>
+      {offered.map((it, i) => <span key={it.id}>{i > 0 && ' + '}{link(it)}</span>)}
+      {offer.sweeteners.map((s) => <span key={s}> + {s.toLowerCase()}</span>)}
+    </>
+  );
+  const getsNode = offer.listing ? link(offer.listing) : 'Item';
+  const left = { k: iSent ? (done ? 'You gave' : 'You give') : (done ? 'They gave' : 'They give'), v: givesNode };
+  const right = { k: iSent ? (done ? 'You got' : 'For their') : (done ? 'You gave' : 'For your'), v: getsNode };
   return (
     <div className="row" style={{ gap: 8, alignItems: 'stretch' }}>
       <div className="swap-box" style={{ background: 'var(--bg)' }}><div className="k">{left.k}</div><div className="v">{left.v}</div></div>

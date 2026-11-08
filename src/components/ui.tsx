@@ -32,7 +32,7 @@ export function BottomNav() {
       <Link href="/post" aria-label="Post an item">
         <span className="plus"><Icon name="plus" size={24} stroke={2.4} /></span>
       </Link>
-      {item('/trades', 'chat', 'Trades', counts.trades)}
+      {item('/trades', 'chat', 'Chats', counts.trades)}
       {item('/me', 'person', 'Me', counts.me)}
     </nav>
   );
@@ -73,6 +73,21 @@ export function ItemImage({ listing, iconSize = 38 }: { listing: Pick<Listing, '
     return <img src={photoUrl(listing.photo_paths[0])} alt="" loading="lazy" />;
   }
   return <Icon name={CATEGORY_ICON[listing.category]} size={iconSize} stroke={1.6} />;
+}
+
+export function ItemThumb({ item, size = 48, radius = 12 }: {
+  item: Pick<Listing, 'category' | 'photo_paths'> | null; size?: number; radius?: number;
+}) {
+  const cat = item?.category ?? 'dorm';
+  return (
+    <span className={CATEGORY_TINT[cat]} style={{ width: size, height: size, borderRadius: radius, overflow: 'hidden', flexShrink: 0,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+      {item?.photo_paths?.length
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={photoUrl(item.photo_paths[0])} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        : <Icon name={CATEGORY_ICON[cat]} size={Math.round(size * 0.5)} stroke={1.6} />}
+    </span>
+  );
 }
 
 export function ListingCard({ listing, mine }: { listing: Listing; mine?: boolean }) {

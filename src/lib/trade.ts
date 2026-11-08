@@ -52,17 +52,25 @@ export type Offer = {
   suggested_spot: string | null; status: OfferStatus; meet_spot: string | null; meet_at: string | null;
   from_confirmed: boolean; to_confirmed: boolean; created_at: string;
   awaiting: string | null; counter_count: number; countered_by: string | null;
-  listing: Pick<Listing, 'id' | 'title' | 'tier' | 'category'> | null;
+  listing: Pick<Listing, 'id' | 'title' | 'tier' | 'category' | 'photo_paths'> | null;
   from: Profile | null; to: Profile | null;
-  items: { listing: Pick<Listing, 'id' | 'title' | 'tier'> | null }[];
+  items: { listing: Pick<Listing, 'id' | 'title' | 'tier' | 'category' | 'photo_paths'> | null }[];
+  updated_at?: string;
 };
 
 // One query shape for offers, used by the inbox and the chat
 export const OFFER_SELECT = `*,
-  listing:listings!offers_listing_id_fkey(id,title,tier,category),
+  listing:listings!offers_listing_id_fkey(id,title,tier,category,photo_paths),
   from:profiles!offers_from_user_fkey(id,first_name,last_initial),
   to:profiles!offers_to_user_fkey(id,first_name,last_initial),
-  items:offer_items(listing:listings(id,title,tier))`;
+  items:offer_items(listing:listings(id,title,tier,category,photo_paths))`;
+
+// From my side of a trade: the item I get and the first item I give
+export function sides(o: Offer, myId: string) {
+  const offered = o.items.map((i) => i.listing).filter(Boolean) as NonNullable<Offer['items'][number]['listing']>[];
+  const iSent = o.from_user === myId;
+  return { get: iSent ? o.listing : offered[0] ?? null, give: iSent ? offered[0] ?? null : o.listing };
+}
 
 // Whose turn it is to answer a pending offer (starts with the owner; a counter passes it back)
 export const turnOf = (o: Offer) => o.awaiting ?? o.to_user;

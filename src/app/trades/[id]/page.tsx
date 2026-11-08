@@ -6,14 +6,14 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase, getSafeSpots, type SafeSpot } from '@/lib/supabase';
 import { uploadChatPhoto } from '@/lib/photos';
 import { blockedAnywhere } from '@/lib/banned';
-import { OFFER_SELECT, displayName, friendlyError, offerGives, turnOf, type Offer } from '@/lib/trade';
+import { OFFER_SELECT, displayName, friendlyError, offerGives, sides, turnOf, type Offer } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Handoff } from '@/components/Handoff';
 import { ShareTrade } from '@/components/ShareTrade';
 import { useNotifications } from '@/components/Notifications';
 import { SwapRow, statusPill } from '@/components/OfferCard';
-import { Avatar, Loading } from '@/components/ui';
+import { ItemThumb, Loading } from '@/components/ui';
 
 type Message = { id: string; sender_id: string; body: string | null; image_path: string | null; created_at: string };
 
@@ -49,6 +49,7 @@ export default function TradeChat() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [missing, setMissing] = useState(false);
+  const [details, setDetails] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -151,44 +152,74 @@ export default function TradeChat() {
   const myTurn = offer.status === 'pending' && turnOf(offer) === me.id;
   const canChat = offer.status === 'pending' || offer.status === 'accepted';
 
+  const { get, give } = sides(offer, me.id);
+  const answer = (action: 'accept' | 'decline') => act(() => supabase.rpc('respond_offer', { p_offer: id, p_action: action }));
+  const turnButtons = (
+    <div className="row" style={{ gap: 8 }}>
+      <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }} disabled={busy}
+        onClick={() => answer('decline')}>Decline</button>
+      <Link href={`/trades/${id}/counter`} className="btn small" style={{ background: 'var(--surface)', color: 'var(--blue)', border: '1.5px solid var(--blue)' }}>
+        Counter
+      </Link>
+      <button className="btn small" disabled={busy} onClick={() => answer('accept')}>Accept</button>
+    </div>
+  );
+
+  // One line under the header, only when there's something to do next
+  const strip =
+    myTurn ? (
+      <div key="turn" className="stack" style={{ gap: 8, padding: '10px 16px 12px', background: 'var(--surface)', borderBottom: '1px solid var(--border-soft)' }}>
+        <span style={{ fontSize: 13 }}>
+          <b>{offer.counter_count > 0 ? `${otherName} countered` : `${otherName} offers`}</b>{' '}
+          {offer.items.map((i, n) => i.listing && (
+            <span key={i.listing.id}>{n > 0 && ' + '}
+              <Link href={`/item/${i.listing.id}`} style={{ color: 'var(--ink)', textDecoration: 'underline', textDecorationColor: 'var(--border)', textUnderlineOffset: 3 }}>{i.listing.title}</Link>
+            </span>
+          ))}
+          {offer.sweeteners.map((sw) => <span key={sw}> + {sw.toLowerCase()}</span>)}
+        </span>
+        {turnButtons}
+      </div>
+    ) : offer.status === 'pending' ? (
+      <button key="waiting" onClick={() => setDetails(true)} style={{ width: '100%', textAlign: 'left', borderWidth: '0 0 1px 0', borderStyle: 'solid', borderColor: 'var(--border-soft)', background: 'var(--bg)', padding: '10px 20px', fontSize: 13, color: 'var(--muted)' }}>
+        Waiting for {otherName}
+      </button>
+    ) : offer.status === 'accepted' ? (
+      <button key="meetup" onClick={() => setDetails(true)} className="spread"
+        style={{ width: '100%', borderWidth: 0, background: 'var(--ink)', color: '#fff', padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>
+        <span className="row" style={{ gap: 8 }}>
+          <span style={{ color: 'var(--lime)' }}><Icon name="pin" size={16} /></span>
+          {offer.meet_at ? `${fmtMeet(offer.meet_at)} · ${spot?.short_name ?? ''}` : 'Set the meetup'}
+        </span>
+        <span style={{ color: 'var(--lime)' }}>{offer.meet_at ? 'Finish trade ›' : 'Set ›'}</span>
+      </button>
+    ) : offer.status === 'completed' && !myRating ? (
+      <button key="rate" onClick={() => setDetails(true)} className="spread"
+        style={{ width: '100%', borderWidth: 0, background: 'var(--lime)', color: 'var(--ink)', padding: '10px 20px', fontSize: 13, fontWeight: 700 }}>
+        <span>Swapped! Rate {otherName}</span><span>›</span>
+      </button>
+    ) : null;
+
   return (
     <>
-      <header style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--surface)', borderBottom: '1px solid var(--border-soft)', padding: '12px 20px' }}
-        className="row">
-        <button className="icon-btn" aria-label="Back" onClick={() => router.push('/trades')}><Icon name="back" size={20} stroke={2.2} /></button>
-        <Avatar profile={other} size={40} solid="blue" />
-        <div className="grow" style={{ fontFamily: 'var(--display)', fontSize: 18, fontWeight: 700, letterSpacing: -0.3 }}>{displayName(other)}</div>
-        <Link href={`/trades/${id}/report`} className="icon-btn plain" aria-label="Report this chat" style={{ background: 'transparent' }}>
-          <Icon name="flag" size={20} />
-        </Link>
-      </header>
+      <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+        <header style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border-soft)', padding: '12px 16px' }} className="row">
+          <button className="icon-btn" aria-label="Back" onClick={() => router.push('/trades')}><Icon name="back" size={20} stroke={2.2} /></button>
+          <button onClick={() => setDetails(true)} className="grow" aria-label="Trade details"
+            style={{ border: 'none', background: 'transparent', padding: 0, color: 'var(--ink)', minWidth: 0, textAlign: 'left',
+              fontFamily: 'var(--display)', fontSize: 18, fontWeight: 700, letterSpacing: -0.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {displayName(other)}
+          </button>
+          <span className="row" style={{ gap: 4, flexShrink: 0 }}>
+            {get ? <Link href={`/item/${get.id}`} aria-label={`See ${get.title}`}><ItemThumb item={get} size={32} radius={8} /></Link> : <ItemThumb item={null} size={32} radius={8} />}
+            <span style={{ color: 'var(--pink)', display: 'inline-flex' }}><Icon name="swap" size={14} /></span>
+            {give ? <Link href={`/item/${give.id}`} aria-label={`See ${give.title}`}><ItemThumb item={give} size={32} radius={8} /></Link> : <ItemThumb item={null} size={32} radius={8} />}
+          </span>
+        </header>
+        {strip}
+      </div>
 
       <main className="screen" style={{ paddingBottom: 100, gap: 12 }}>
-        {/* Pinned offer */}
-        <div className="card stack">
-          <div className="spread">
-            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.4, color: 'var(--muted)' }}>
-              OFFER
-            </span>
-            {statusPill(offer, me.id)}
-          </div>
-          <SwapRow offer={offer} myId={me.id} />
-          {myTurn && (
-            <div className="row" style={{ gap: 8 }}>
-              <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }} disabled={busy}
-                onClick={() => act(() => supabase.rpc('respond_offer', { p_offer: id, p_action: 'decline' }))}>Decline</button>
-              <Link href={`/trades/${id}/counter`} className="btn small" style={{ background: 'var(--surface)', color: 'var(--blue)', border: '1.5px solid var(--blue)' }}>
-                Counter
-              </Link>
-              <button className="btn small" disabled={busy}
-                onClick={() => act(() => supabase.rpc('respond_offer', { p_offer: id, p_action: 'accept' }))}>Accept</button>
-            </div>
-          )}
-          {offer.status === 'pending' && !myTurn && (
-            <p className="meta" style={{ margin: 0 }}>Waiting for {otherName}</p>
-          )}
-        </div>
-
         {/* Messages */}
         {messages.map((m) => {
           const mine = m.sender_id === me.id;
@@ -212,8 +243,33 @@ export default function TradeChat() {
         })}
         {sendingPhoto && <div className="bubble out" style={{ opacity: 0.6 }}>Sending photo…</div>}
 
-        {/* Meetup + finishing */}
-        {(offer.status === 'accepted' || offer.status === 'completed') && (
+        {error && <div className="alert">{error}</div>}
+        <div ref={bottom} />
+      </main>
+
+      {/* Trade details: everything about the trade, so the chat stays just messages */}
+      {details && (
+        <div role="dialog" aria-label="Trade details" onClick={() => setDetails(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(22,22,26,0.35)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={(e) => e.stopPropagation()} className="stack"
+            style={{ width: '100%', maxWidth: 430, maxHeight: '88dvh', overflowY: 'auto', background: 'var(--bg)', borderRadius: '24px 24px 0 0', padding: '12px 20px 28px', gap: 14 }}>
+            <span style={{ width: 40, height: 5, borderRadius: 999, background: 'var(--dot-off)', alignSelf: 'center' }} />
+            <div className="spread">
+              <h2 className="title-push">Trade</h2>
+              <button className="icon-btn" aria-label="Close" onClick={() => setDetails(false)}><Icon name="close" size={18} /></button>
+            </div>
+
+            <div className="card stack">
+              <div className="spread">
+                <span style={{ fontSize: 15, fontWeight: 700 }}>{displayName(other)}</span>
+                {statusPill(offer, me.id)}
+              </div>
+              <SwapRow offer={offer} myId={me.id} />
+              {myTurn && turnButtons}
+              {offer.status === 'pending' && !myTurn && <p className="meta" style={{ margin: 0 }}>Waiting for {otherName}</p>}
+            </div>
+
+            {(offer.status === 'accepted' || offer.status === 'completed') && (
           <div style={{ background: 'var(--ink)', color: '#fff', borderRadius: 18, padding: 16 }} className="stack">
             <div className="row">
               <span style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--lime)', color: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -252,11 +308,14 @@ export default function TradeChat() {
               </div>
             )}
           </div>
-        )}
+            )}
 
-        {error && <div className="alert">{error}</div>}
-        <div ref={bottom} />
-      </main>
+            <Link href={`/trades/${id}/report`} className="row" style={{ gap: 8, color: 'var(--muted)', fontSize: 13, fontWeight: 600, alignSelf: 'flex-start' }}>
+              <Icon name="flag" size={16} /> Report chat
+            </Link>
+          </div>
+        </div>
+      )}
 
       {canChat && (
         <div className="action-bar" style={{ padding: '10px 16px 22px', alignItems: 'center' }}>
