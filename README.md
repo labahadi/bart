@@ -84,7 +84,7 @@ The browser can be tampered with, so every rule that matters is also enforced in
 | Nobody can see emails or phone numbers | they only exist in Supabase's private auth table |
 | Only the two people in a trade can see its offer and chat | row-level security |
 | Only the owner can accept; only the sender can cancel; items can't be in two trades at once | `respond_offer` function |
-| Meetups only at listed Safe Spots, 10 AM to 4 PM Philadelphia time | `set_meetup` function |
+| Meetups on campus, any time from 7:30 AM to 8 PM Philadelphia time, within the next two weeks | `meetup_time_ok` function |
 | Trade is complete only when both people confirm | `confirm_complete` function |
 | Reports are anonymous; 3 reports hide a listing for everyone | reports table + trigger |
 
@@ -114,6 +114,8 @@ Run each of these once in the Supabase **SQL Editor**, in order, after 0001–00
 | `0010_pauses.sql` | **Pausing accounts** for 1 day, 3 days, 7 days or until further notice, from any report card (reason required, shown to the person). While paused they can't post, offer, message, comment, like, share or send photos, and their listings are hidden; they see a banner and can still read chats and report. The **Paused** tab on Reports lists everyone paused, with **Lift pause**. Suggested ladder: first offense 1 day, second 3 days, third 7 days; sexual content or threats can go straight to until further notice. |
 | `0011_categories_spots_times.sql` | Adds the **Misc** category (Dorm is now shown as "Dorm supplies"); meetup spots are **Van Pelt Library, Houston Hall, Rodin lobby, Harnwell lobby, Stommons, McClelland**, or **somewhere else on campus** (typed in, then checked by AI to be a public place on or next to Penn's campus before it's saved); meetups can start from **10 AM to 8 PM**. Finishing a trade is now a 4-digit code only (no QR). |
 | `0012_map_places.sql` | **Somewhere else on campus** now searches **Google Maps**. People pick a real place or address; the server looks up its exact location, refuses anything outside the campus boundary (about 30th–40th St, Market St–Baltimore Ave), and shows the walking time from Locust Walk at 37th. Addresses are fine as long as they're inside the boundary. Every meetup gets **Directions** (opens Apple Maps on iPhone, Google Maps elsewhere) and **Share with a friend**. Replaces the AI place check. |
+| `0013_typed_times.sql` | Meetup times are typed in, to the minute, instead of picked from buttons. A meetup can be set for right now, up to two weeks out. People pick the place by searching Google Maps (no preset spots). |
+| `0014_earlier_start.sql` | Meetups can start as early as **7:30 AM** (latest is still 8:00 PM). |
 
 Then run `npm install` again (the QR code feature added a package).
 
@@ -153,7 +155,7 @@ To add more blocked words (for example slurs), add rows to `banned_terms` with `
 4. Add it to `.env.local` and to Vercel's Environment Variables as `GOOGLE_MAPS_API_KEY=...` (no `NEXT_PUBLIC_`; it stays on the server), then restart / redeploy.
 5. Protect against surprise bills: **Billing → Budgets & alerts** (e.g. a $5 alert), and **APIs & Services → Places API (New) → Quotas** to cap requests per day.
 
-Without the key, the six listed spots still work; "Somewhere else on campus" says it's not set up yet. To move the campus boundary, edit the numbers in `src/lib/campus.ts` and `on_campus()` in `0012_map_places.sql`.
+Without the key, people can't pick a meetup place, so set it up before trading. To move the campus boundary, edit the numbers in `src/lib/campus.ts` and `on_campus()` in `0012_map_places.sql`.
 
 ## Running the beta
 
@@ -181,7 +183,6 @@ select status, count(*) from offers group by status;                 -- offers b
 ## Decisions I made that you should check
 
 - **Name at sign-up.** The spec shows "Jordan L." on item pages but never collects a name, so step 3 asks for a first name and last initial. Names never appear on feed cards.
-- **6 PM is off.** The spec allows 6 PM, but in Philadelphia it's dark by about 5 PM from November to February. Slots run 10 AM to 4 PM. If you want 6 PM back in spring, change it in `set_meetup` (SQL) and `SLOTS` (meetup page).
 - **Banned words match whole words.** The spec says "substring," but substring matching blocks "in*credible* condition" (edible) and "be*gun*". Whole words plus plurals fixes that, and "vapes" and "answer keys" are still caught.
 - **"Ask" before an offer isn't there yet.** Chat lives inside a trade, which keeps all messages tied to a real offer and easy to moderate.
 - **Skill counts as M** on the fairness meter, and the meter compares against the item you're asking for (the spec's example only covered M).

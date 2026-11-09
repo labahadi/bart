@@ -76,8 +76,8 @@ export default function Meetup() {
 
   const day = days[dayIdx];
   const at = time ? nyInstant(day.y, day.m, day.d, +time.slice(0, 2), +time.slice(3, 5)) : null;
-  // Any minute from 10:00 AM to 8:00 PM, and not already over (a few minutes of slack, so "now" works)
-  const timeProblem = !at ? '' : time < '10:00' || time > '20:00' ? 'Meetups are between 10 AM and 8 PM.'
+  // Any minute from 7:30 AM to 8:00 PM, and not already over (a few minutes of slack, so "now" works)
+  const timeProblem = !at ? '' : time < '07:30' || time > '20:00' ? 'Meetups are between 7:30 AM and 8 PM.'
     : at.getTime() < Date.now() - 5 * 60 * 1000 ? 'That time already passed.' : '';
   const timeOk = !!at && !timeProblem;
   const timeLabel = time ? label12(time) : '';
@@ -137,9 +137,9 @@ export default function Meetup() {
 
         <div>
           <label className="label" htmlFor="time" style={{ display: 'block' }}>Time</label>
-          <input id="time" type="time" className={`input ${timeProblem ? 'invalid' : ''}`} min="10:00" max="20:00"
+          <input id="time" type="time" className={`input ${timeProblem ? 'invalid' : ''}`} min="07:30" max="20:00"
             value={time} onChange={(e) => setTime(e.target.value)} style={{ height: 52, fontSize: 17 }} />
-          <p className={timeProblem ? 'error-text' : 'meta'} style={{ marginTop: 6 }}>{timeProblem || 'Any time from 10 AM to 8 PM'}</p>
+          <p className={timeProblem ? 'error-text' : 'meta'} style={{ marginTop: 6 }}>{timeProblem || 'Any time from 7:30 AM to 8 PM'}</p>
         </div>
 
         <div>

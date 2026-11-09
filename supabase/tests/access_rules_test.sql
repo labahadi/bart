@@ -149,9 +149,12 @@ select t.expect_error('9 PM meetup refused',
 select t.expect_error('8:30 PM meetup refused',
   format($$select set_meetup(%L, 'van-pelt', (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 20 hours 30 minutes') at time zone 'America/New_York')$$,
     (select offer_id from ids)), '8 PM');
-select t.expect_error('9:45 AM meetup refused',
-  format($$select set_meetup(%L, 'van-pelt', (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 9 hours 45 minutes') at time zone 'America/New_York')$$,
-    (select offer_id from ids)), '10 AM');
+select t.expect_error('7:15 AM meetup refused',
+  format($$select set_meetup(%L, 'van-pelt', (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 7 hours 15 minutes') at time zone 'America/New_York')$$,
+    (select offer_id from ids)), '7:30 AM');
+select set_meetup((select offer_id from ids), 'stommons',
+  (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 7 hours 30 minutes') at time zone 'America/New_York');
+select t.expect('7:30 AM sharp is allowed', (select meet_spot = 'stommons' from offers where id = (select offer_id from ids)));
 select t.expect_error('time an hour ago refused',
   format($$select set_meetup(%L, 'van-pelt', now() - interval '1 hour')$$, (select offer_id from ids)), 'already passed');
 select t.expect_error('a month out refused',
