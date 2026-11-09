@@ -15,7 +15,6 @@ type Shared = {
   lat: number | null; lng: number | null; confirmed: boolean; gives: string | null; gets: string | null;
 };
 
-const CATEGORIES = ['Textbooks', 'Dorm supplies', 'Clothes', 'Tickets', 'Skills'];
 
 export default function SharedMeetup() {
   const { token } = useParams<{ token: string }>();
@@ -74,10 +73,7 @@ export default function SharedMeetup() {
       )}
 
       <div className="stack" style={{ gap: 10, marginTop: 'auto', paddingTop: 24, borderTop: '1px solid var(--border-soft)' }}>
-        <span className="display" style={{ fontSize: 22 }}>No money? No problem.</span>
-        <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-          {CATEGORIES.map((c) => <span key={c} className="pill" style={{ background: 'var(--surface)', border: '1px solid var(--border-soft)' }}>{c}</span>)}
-        </div>
+        <span className="display" style={{ fontSize: 22 }}>Broke? So is everyone else.</span>
         <Link href="/login" className="btn pink" style={{ marginTop: 4 }}>Join with your Penn email</Link>
       </div>
     </main>
