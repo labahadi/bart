@@ -8,11 +8,11 @@ import { Icon } from '@/components/Icon';
 import { Loading, PushHeader } from '@/components/ui';
 
 const TZ = 'America/New_York';
-// Meetups start between 10 AM and 8 PM
-const SLOTS: { h: number; label: string; off?: boolean }[] = [
-  { h: 10, label: '10 AM' }, { h: 12, label: '12 PM' }, { h: 14, label: '2 PM' },
-  { h: 16, label: '4 PM' }, { h: 18, label: '6 PM' }, { h: 20, label: '8 PM' },
-];
+// "16:15" -> "4:15 PM"
+function label12(hhmm: string) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
 
 // Philadelphia calendar date parts for a Date
 function nyParts(d: Date) {
@@ -21,9 +21,9 @@ function nyParts(d: Date) {
   return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour, wd: p.weekday };
 }
 
-// The instant that is `hour`:00 Philadelphia time on the given date (handles daylight saving)
-function nyInstant(y: number, m: number, d: number, hour: number) {
-  let t = Date.UTC(y, m - 1, d, hour + 5);
+// The instant that is hour:minute Philadelphia time on the given date (handles daylight saving)
+function nyInstant(y: number, m: number, d: number, hour: number, minute = 0) {
+  let t = Date.UTC(y, m - 1, d, hour + 5, minute);
   for (let i = 0; i < 2; i++) {
     const p = nyParts(new Date(t));
     const diff = (Date.UTC(p.y, p.m - 1, p.d, p.h) - Date.UTC(y, m - 1, d, hour)) / 3600000;
@@ -37,7 +37,7 @@ export default function Meetup() {
   const router = useRouter();
   const [offer, setOffer] = useState<Offer | null>(null);
   const [dayIdx, setDayIdx] = useState(0);
-  const [hour, setHour] = useState<number | null>(null);
+  const [time, setTime] = useState(''); // "HH:MM", 24-hour
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<{ placeId: string; name: string; detail: string }[]>([]);
   const [picked, setPicked] = useState<{ placeId: string; name: string; detail: string } | null>(null);
@@ -75,9 +75,12 @@ export default function Meetup() {
   if (!offer) return <Loading />;
 
   const day = days[dayIdx];
-  const slotTime = (h: number) => nyInstant(day.y, day.m, day.d, h);
-  const isPast = (h: number) => slotTime(h).getTime() < Date.now() + 30 * 60 * 1000;
-  const slotLabel = SLOTS.find((s) => s.h === hour)?.label;
+  const at = time ? nyInstant(day.y, day.m, day.d, +time.slice(0, 2), +time.slice(3, 5)) : null;
+  // Any minute from 10:00 AM to 8:00 PM, and not already over (a few minutes of slack, so "now" works)
+  const timeProblem = !at ? '' : time < '10:00' || time > '20:00' ? 'Meetups are between 10 AM and 8 PM.'
+    : at.getTime() < Date.now() - 5 * 60 * 1000 ? 'That time already passed.' : '';
+  const timeOk = !!at && !timeProblem;
+  const timeLabel = time ? label12(time) : '';
 
   async function api(body: Record<string, unknown>) {
     const { data: sess } = await supabase.auth.getSession();
@@ -104,13 +107,13 @@ export default function Meetup() {
   }
 
   async function save() {
-    if (hour === null || !picked) return;
+    if (!timeOk || !at || !picked) return;
     setBusy(true); setError('');
-    const { ok, json } = await api({ placeId: picked.placeId, name: picked.name, at: slotTime(hour).toISOString() });
+    const { ok, json } = await api({ placeId: picked.placeId, name: picked.name, at: at.toISOString() });
     setBusy(false);
     if (!ok) { setError(json.error ?? "Couldn't save that place. Try again."); return; }
     // Drop a note in the chat so the other person sees the change
-    await supabase.from('messages').insert({ offer_id: id, body: `Meetup set: ${day.wd} ${day.m}/${day.d}, ${slotLabel} at ${json.name}` });
+    await supabase.from('messages').insert({ offer_id: id, body: `Meetup set: ${day.wd} ${day.m}/${day.d}, ${timeLabel} at ${json.name}` });
     router.replace(`/trades/${id}`);
   }
 
@@ -123,7 +126,7 @@ export default function Meetup() {
           <p className="label">Day</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
             {days.map((d, i) => (
-              <button key={i} onClick={() => { setDayIdx(i); setHour(null); }}
+              <button key={i} onClick={() => setDayIdx(i)}
                 style={{ height: 64, borderRadius: 12, border: dayIdx === i ? 'none' : '1px solid var(--border)', background: dayIdx === i ? 'var(--ink)' : 'var(--surface)', color: dayIdx === i ? '#fff' : 'var(--ink)', padding: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>{d.wd}</div>
                 <div style={{ fontFamily: 'var(--display)', fontSize: 20, fontWeight: 700 }}>{d.d}</div>
@@ -133,22 +136,10 @@ export default function Meetup() {
         </div>
 
         <div>
-          <p className="label">Time</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-            {SLOTS.map((s) => {
-              const disabled = isPast(s.h);
-              const on = hour === s.h;
-              return (
-                <button key={s.h} disabled={disabled} onClick={() => setHour(s.h)}
-                  style={{ height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600,
-                    background: on ? 'var(--blue)' : disabled ? 'var(--border-soft)' : 'var(--surface)',
-                    color: on ? '#fff' : disabled ? 'var(--muted)' : 'var(--ink)',
-                    border: on ? 'none' : '1px solid var(--border)' }}>
-                  {s.label}
-                </button>
-              );
-            })}
-          </div>
+          <label className="label" htmlFor="time" style={{ display: 'block' }}>Time</label>
+          <input id="time" type="time" className={`input ${timeProblem ? 'invalid' : ''}`} min="10:00" max="20:00"
+            value={time} onChange={(e) => setTime(e.target.value)} style={{ height: 52, fontSize: 17 }} />
+          <p className={timeProblem ? 'error-text' : 'meta'} style={{ marginTop: 6 }}>{timeProblem || 'Any time from 10 AM to 8 PM'}</p>
         </div>
 
         <div>
@@ -181,8 +172,8 @@ export default function Meetup() {
         {error && <div className="alert"><Icon name="warning" size={18} />{error}</div>}
       </main>
       <div className="action-bar">
-        <button className="btn pink" disabled={hour === null || !picked || checking || busy} onClick={save}>
-          {busy ? 'Saving…' : hour === null ? 'Pick a time' : !picked ? 'Pick a place' : `${day.wd} ${slotLabel} · ${picked.name}`}
+        <button className="btn pink" disabled={!timeOk || !picked || checking || busy} onClick={save}>
+          {busy ? 'Saving…' : !timeOk ? 'Pick a time' : !picked ? 'Pick a place' : `${day.wd} ${timeLabel} · ${picked.name}`}
         </button>
       </div>
     </>

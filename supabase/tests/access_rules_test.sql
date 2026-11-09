@@ -146,6 +146,22 @@ select t.as_user('00000000-0000-0000-0000-00000000000a');
 select t.expect_error('9 PM meetup refused',
   format($$select set_meetup(%L, 'van-pelt', (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 21 hours') at time zone 'America/New_York')$$,
     (select offer_id from ids)), '8 PM');
+select t.expect_error('8:30 PM meetup refused',
+  format($$select set_meetup(%L, 'van-pelt', (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 20 hours 30 minutes') at time zone 'America/New_York')$$,
+    (select offer_id from ids)), '8 PM');
+select t.expect_error('9:45 AM meetup refused',
+  format($$select set_meetup(%L, 'van-pelt', (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 9 hours 45 minutes') at time zone 'America/New_York')$$,
+    (select offer_id from ids)), '10 AM');
+select t.expect_error('time an hour ago refused',
+  format($$select set_meetup(%L, 'van-pelt', now() - interval '1 hour')$$, (select offer_id from ids)), 'already passed');
+select t.expect_error('a month out refused',
+  format($$select set_meetup(%L, 'van-pelt', now() + interval '30 days')$$, (select offer_id from ids)), 'two weeks');
+select set_meetup((select offer_id from ids), 'houston',
+  (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 20 hours') at time zone 'America/New_York');
+select t.expect('8:00 PM sharp is allowed', (select meet_spot = 'houston' from offers where id = (select offer_id from ids)));
+select set_meetup((select offer_id from ids), 'rodin',
+  (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 14 hours 15 minutes') at time zone 'America/New_York');
+select t.expect('2:15 PM (any minute) is allowed', (select meet_spot = 'rodin' from offers where id = (select offer_id from ids)));
 select t.expect_error('unlisted spot refused',
   format($$select set_meetup(%L, 'my-dorm', now() + interval '2 days')$$, (select offer_id from ids)), 'spot from the list');
 select set_meetup((select offer_id from ids), 'houston',

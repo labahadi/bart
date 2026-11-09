@@ -17,5 +17,6 @@ $P -d bart_test -f supabase/migrations/0009_safety.sql
 $P -d bart_test -f supabase/migrations/0010_pauses.sql
 $P -d bart_test -f supabase/migrations/0011_categories_spots_times.sql
 $P -d bart_test -f supabase/migrations/0012_map_places.sql
+$P -d bart_test -f supabase/migrations/0013_typed_times.sql
 $P -d bart_test -f supabase/tests/grants_stub.sql
 $P -d bart_test -f supabase/tests/access_rules_test.sql
