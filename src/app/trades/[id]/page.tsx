@@ -21,15 +21,28 @@ type Message = { id: string; sender_id: string; body: string | null; image_path:
 const fmtMeet = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-// Google Calendar link for the meetup (1 hour)
-function calendarLink(o: Offer, spot?: SafeSpot) {
+// "a, b and c"
+const joinAnd = (xs: string[]) => xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+
+// Google Calendar link for the meetup (1 hour), written from the viewer's side
+function calendarLink(o: Offer, myId: string, spot?: SafeSpot) {
   if (!o.meet_at) return '#';
   const start = new Date(o.meet_at);
   const end = new Date(start.getTime() + 60 * 60 * 1000);
   const f = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const iSent = o.from_user === myId;
+  const other = iSent ? o.to : o.from;
+  const offered = [...o.items.map((i) => i.listing?.title).filter(Boolean) as string[], ...o.sweeteners.map((x) => x.toLowerCase())];
+  const target = o.listing?.title ? [o.listing.title] : [];
+  const [give, get] = iSent ? [offered, target] : [target, offered];
+  const name = other ? `${other.first_name}${other.last_initial ? ` ${other.last_initial}.` : ''}` : 'a Penn student';
   const p = new URLSearchParams({
-    action: 'TEMPLATE', text: `bart: ${o.listing?.title ?? 'trade'}`, dates: `${f(start)}/${f(end)}`,
-    location: o.meet_address || o.meet_custom || spot?.name || '', details: `Trade: ${offerGives(o)} for ${o.listing?.title ?? ''}`,
+    action: 'TEMPLATE',
+    text: `bart Exchange With ${name}`,
+    dates: `${f(start)}/${f(end)}`,
+    // The street address, so the calendar can map it (older meetups at a listed spot only have its name)
+    location: o.meet_address || `${o.meet_custom || spot?.name || ''}, Philadelphia, PA 19104`,
+    details: `Bring ${joinAnd(give) || 'your item'} to trade for ${joinAnd(get) || 'their item'}`,
   });
   return `https://calendar.google.com/calendar/render?${p}`;
 }
@@ -306,7 +319,7 @@ export default function TradeChat() {
               <div className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
                 <a href={directionsUrl({ name: offer.meet_custom ?? spot?.name ?? '', lat: offer.meet_lat, lng: offer.meet_lng })} target="_blank" rel="noreferrer"
                   style={{ color: 'var(--lime)', fontSize: 13, fontWeight: 600 }}>Directions</a>
-                <a href={calendarLink(offer, spot)} target="_blank" rel="noreferrer"
+                <a href={calendarLink(offer, me.id, spot)} target="_blank" rel="noreferrer"
                   style={{ color: 'var(--pink-bright)', fontSize: 13, fontWeight: 600 }}>Add to calendar</a>
                 <button onClick={() => shareWithFriend(offer, spot)}
                   style={{ background: 'none', border: 'none', padding: 0, color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 3 }}>
