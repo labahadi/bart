@@ -51,7 +51,8 @@ export type OfferStatus = 'pending' | 'accepted' | 'declined' | 'cancelled' | 'c
 export type Offer = {
   id: string; listing_id: string; from_user: string; to_user: string; sweeteners: string[];
   suggested_spot: string | null; status: OfferStatus; meet_spot: string | null; meet_at: string | null;
-  meet_custom?: string | null;
+  meet_custom?: string | null; meet_address?: string | null; meet_lat?: number | null; meet_lng?: number | null;
+  meet_walk_min?: number | null; meet_pickup?: boolean;
   from_confirmed: boolean; to_confirmed: boolean; created_at: string;
   awaiting: string | null; counter_count: number; countered_by: string | null;
   listing: Pick<Listing, 'id' | 'title' | 'tier' | 'category' | 'photo_paths'> | null;

@@ -25,7 +25,7 @@ function takeNext() {
 const RULES = [
   ['No exams, answer keys or graded work', "Tutoring is fine. Doing someone's homework isn't."],
   ['No drugs, alcohol, weapons or adult content', 'These listings get removed and accounts suspended.'],
-  ['Meet at Safe Spots', 'Public, staffed places on campus, during the day.'],
+  ['Meet in public, or at the door for big items', 'On campus, between 10 AM and 8 PM.'],
   ['Show up, or cancel early', 'Two no-shows means a short break from trading.'],
 ];
 

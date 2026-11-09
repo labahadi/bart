@@ -130,7 +130,7 @@ export default function ItemDetail() {
 
         <div className="row" style={{ background: 'var(--green-tint)', borderRadius: 12, padding: '10px 12px', fontSize: 13, gap: 8 }}>
           <Icon name="shield" size={18} />
-          <span>Meet at a <b>Safe Spot</b></span>
+          <span>Meet on campus, <b>10 AM to 8 PM</b></span>
         </div>
 
         {error && <div className="alert">{error}</div>}

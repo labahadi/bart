@@ -10,6 +10,7 @@ import { OFFER_SELECT, displayName, friendlyError, offerGives, sides, turnOf, ty
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Handoff } from '@/components/Handoff';
+import { directionsUrl } from '@/lib/campus';
 import { ShareTrade } from '@/components/ShareTrade';
 import { useNotifications } from '@/components/Notifications';
 import { SwapRow, statusPill } from '@/components/OfferCard';
@@ -28,9 +29,18 @@ function calendarLink(o: Offer, spot?: SafeSpot) {
   const f = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const p = new URLSearchParams({
     action: 'TEMPLATE', text: `bart: ${o.listing?.title ?? 'trade'}`, dates: `${f(start)}/${f(end)}`,
-    location: o.meet_custom ?? spot?.name ?? '', details: `Trade: ${offerGives(o)} for ${o.listing?.title ?? ''}`,
+    location: o.meet_address || o.meet_custom || spot?.name || '', details: `Trade: ${offerGives(o)} for ${o.listing?.title ?? ''}`,
   });
   return `https://calendar.google.com/calendar/render?${p}`;
+}
+
+// Send the meetup time and place to a friend (phone share sheet, or a text as a fallback)
+function shareWithFriend(o: Offer, spot?: SafeSpot) {
+  const place = o.meet_address || o.meet_custom || spot?.name || '';
+  const when = o.meet_at ? fmtMeet(o.meet_at) : '';
+  const text = `I'm meeting someone from bart for a trade: ${when} at ${place}${o.meet_pickup ? ' (pickup)' : ''}.`;
+  if (typeof navigator !== 'undefined' && navigator.share) navigator.share({ text }).catch(() => {});
+  else window.location.href = `sms:?&body=${encodeURIComponent(text)}`;
 }
 
 export default function TradeChat() {
@@ -281,7 +291,10 @@ export default function TradeChat() {
               </span>
               <div className="grow">
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{offer.meet_at ? fmtMeet(offer.meet_at) : 'No time yet'}</div>
-                <div style={{ fontSize: 13, color: 'var(--dark-sub)' }}>{offer.meet_custom ?? spot?.name ?? ''}</div>
+                <div style={{ fontSize: 13, color: 'var(--dark-sub)' }}>
+                  {offer.meet_pickup ? 'Pickup at ' : ''}{offer.meet_custom ?? spot?.name ?? ''}
+                  {offer.meet_walk_min != null && ` · ${offer.meet_walk_min} min walk`}
+                </div>
               </div>
               {offer.status === 'accepted' && (
                 <Link href={`/trades/${id}/meetup`} style={{ background: '#fff', color: 'var(--ink)', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 600 }}>
@@ -289,9 +302,20 @@ export default function TradeChat() {
                 </Link>
               )}
             </div>
+            {offer.meet_pickup && offer.status === 'accepted' && (
+              <div style={{ fontSize: 13, color: 'var(--dark-sub)' }}>Meet at the door or in the lobby. Bring a friend if you can.</div>
+            )}
             {offer.meet_at && offer.status === 'accepted' && (
-              <a href={calendarLink(offer, spot)} target="_blank" rel="noreferrer"
-                style={{ color: 'var(--pink-bright)', fontSize: 13, fontWeight: 600 }}>Add to calendar</a>
+              <div className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
+                <a href={directionsUrl({ name: offer.meet_custom ?? spot?.name ?? '', lat: offer.meet_lat, lng: offer.meet_lng })} target="_blank" rel="noreferrer"
+                  style={{ color: 'var(--lime)', fontSize: 13, fontWeight: 600 }}>Directions</a>
+                <a href={calendarLink(offer, spot)} target="_blank" rel="noreferrer"
+                  style={{ color: 'var(--pink-bright)', fontSize: 13, fontWeight: 600 }}>Add to calendar</a>
+                <button onClick={() => shareWithFriend(offer, spot)}
+                  style={{ background: 'none', border: 'none', padding: 0, color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 3 }}>
+                  Share with a friend
+                </button>
+              </div>
             )}
             {offer.status === 'accepted' && (
               <div style={{ borderTop: '1px solid #3A3A44', paddingTop: 12 }}>

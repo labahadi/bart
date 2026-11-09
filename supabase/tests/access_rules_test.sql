@@ -459,15 +459,25 @@ select set_meetup((select offer_id from late_offer), 'stommons',
 select t.expect('8 PM meetup allowed', (select meet_spot = 'stommons' from offers where id = (select offer_id from late_offer)));
 select t.expect_error('9 PM meetup refused',
   $$select set_meetup((select offer_id from late_offer), 'stommons', (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 21 hours') at time zone 'America/New_York')$$, '8 PM');
-select t.expect_error('students cannot set a custom place directly',
-  $$select set_meetup_custom((select offer_id from late_offer), auth.uid(), 'Wawa', now() + interval '2 days')$$, 'permission denied');
+select t.expect_error('students cannot set a map place directly',
+  $$select set_meetup_place((select offer_id from late_offer), auth.uid(), '1920 Commons', '3800 Locust Walk', 39.9527, -75.1999, 4, false, now() + interval '2 days')$$, 'permission denied');
 reset role;
-select set_meetup_custom((select offer_id from late_offer), '00000000-0000-0000-0000-00000000000b', 'Wawa on Spruce St',
+select t.expect_error('off-campus place refused',
+  $$select set_meetup_place((select offer_id from late_offer), '00000000-0000-0000-0000-00000000000b', 'Rittenhouse Square', 'Walnut St', 39.9496, -75.1718, 25, false,
+    (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 14 hours') at time zone 'America/New_York')$$, 'off campus');
+select set_meetup_place((select offer_id from late_offer), '00000000-0000-0000-0000-00000000000b', '4012 Pine St', '4012 Pine St, Philadelphia, PA', 39.9505, -75.2040, 6, true,
   (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 14 hours') at time zone 'America/New_York');
-select t.expect('server can set a checked custom place', (select meet_custom = 'Wawa on Spruce St' and meet_spot is null from offers where id = (select offer_id from late_offer)));
+select t.expect('on-campus address saved as a pickup',
+  (select meet_custom = '4012 Pine St' and meet_pickup and meet_walk_min = 6 and meet_spot is null from offers where id = (select offer_id from late_offer)));
 select t.expect('the other person is told, not the one who set it',
   exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-00000000000a' and kind = 'meetup' and body like 'Jordan set the meetup%')
   and not exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-00000000000b' and kind = 'meetup' and ref = (select offer_id from late_offer)));
+set role authenticated;
+select t.as_user('00000000-0000-0000-0000-00000000000b');
+select set_meetup((select offer_id from late_offer), 'harnwell',
+  (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 12 hours') at time zone 'America/New_York');
+select t.expect('picking a listed spot clears the map place',
+  (select meet_spot = 'harnwell' and meet_custom is null and not meet_pickup and meet_lat is null from offers where id = (select offer_id from late_offer)));
 set role authenticated;
 
 reset role;

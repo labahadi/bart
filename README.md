@@ -113,6 +113,7 @@ Run each of these once in the Supabase **SQL Editor**, in order, after 0001–00
 | `0009_safety.sql` | **Keeping sexual content out.** Sexual words are blocked everywhere (chat, comments, names, notes, listings), including disguises like "s3xy" or "nuuudes". Phones can no longer upload photos directly: every photo goes through the server, which checks it with AI first (see below). Adds **Report chat** (flag in the chat header) and a **Chats** section on the Reports screen where reviewers read the conversation and delete messages. |
 | `0010_pauses.sql` | **Pausing accounts** for 1 day, 3 days, 7 days or until further notice, from any report card (reason required, shown to the person). While paused they can't post, offer, message, comment, like, share or send photos, and their listings are hidden; they see a banner and can still read chats and report. The **Paused** tab on Reports lists everyone paused, with **Lift pause**. Suggested ladder: first offense 1 day, second 3 days, third 7 days; sexual content or threats can go straight to until further notice. |
 | `0011_categories_spots_times.sql` | Adds the **Misc** category (Dorm is now shown as "Dorm supplies"); meetup spots are **Van Pelt Library, Houston Hall, Rodin lobby, Harnwell lobby, Stommons, McClelland**, or **somewhere else on campus** (typed in, then checked by AI to be a public place on or next to Penn's campus before it's saved); meetups can start from **10 AM to 8 PM**. Finishing a trade is now a 4-digit code only (no QR). |
+| `0012_map_places.sql` | **Somewhere else on campus** now searches **Google Maps**. People pick a real place or address; the server looks up its exact location, refuses anything outside the campus boundary (about 30th–40th St, Market St–Baltimore Ave), shows the walking time from Locust Walk at 37th, and marks street addresses as **Pickup** with a short safety note. Every meetup gets **Directions** (opens Apple Maps on iPhone, Google Maps elsewhere) and **Share with a friend**. Replaces the AI place check. |
 
 Then run `npm install` again (the QR code feature added a package).
 
@@ -143,6 +144,16 @@ select p.first_name, b.kind, b.category, b.created_at from photo_blocks b join p
 ```
 
 To add more blocked words (for example slurs), add rows to `banned_terms` with `everywhere = true`, and the same words to `EVERYWHERE` in `src/lib/banned.ts`.
+
+### Google Maps (required for "Somewhere else on campus")
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com), create a project named `bart`, and add a billing account (a card is required, but each feature includes 10,000 free uses a month).
+2. **APIs & Services → Library**: enable **Places API (New)** and **Routes API**.
+3. **APIs & Services → Credentials → Create credentials → API key**. Edit the key: under **API restrictions**, allow only Places API (New) and Routes API.
+4. Add it to `.env.local` and to Vercel's Environment Variables as `GOOGLE_MAPS_API_KEY=...` (no `NEXT_PUBLIC_`; it stays on the server), then restart / redeploy.
+5. Protect against surprise bills: **Billing → Budgets & alerts** (e.g. a $5 alert), and **APIs & Services → Places API (New) → Quotas** to cap requests per day.
+
+Without the key, the six listed spots still work; "Somewhere else on campus" says it's not set up yet. To move the campus boundary, edit the numbers in `src/lib/campus.ts` and `on_campus()` in `0012_map_places.sql`.
 
 ## Running the beta
 

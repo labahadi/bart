@@ -41,7 +41,13 @@ export default function Meetup() {
   const [dayIdx, setDayIdx] = useState(0);
   const [hour, setHour] = useState<number | null>(null);
   const [spot, setSpot] = useState<string | null>(null);
-  const [custom, setCustom] = useState('');
+  const [custom, setCustom] = useState('');              // what they've typed
+  const [results, setResults] = useState<{ placeId: string; name: string; detail: string }[]>([]);
+  const [picked, setPicked] = useState<{ placeId: string; name: string; detail: string } | null>(null);
+  const [info, setInfo] = useState<{ walkMin: number | null; pickup: boolean; address: string } | null>(null);
+  const [checking, setChecking] = useState(false);
+  // One Google search session per place picked (keeps searches cheap)
+  const [session, setSession] = useState(() => Math.random().toString(36).slice(2) + Date.now().toString(36));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -56,17 +62,50 @@ export default function Meetup() {
       ]);
       const o = data as unknown as Offer;
       setOffer(o); setSpots(s);
-      if (o?.meet_custom) { setSpot(CUSTOM); setCustom(o.meet_custom); }
-      else setSpot(o?.meet_spot ?? o?.suggested_spot ?? s[0]?.id ?? null);
+      setSpot(o?.meet_spot ?? o?.suggested_spot ?? s[0]?.id ?? null);
     })();
   }, [id]);
+
+  // Search Google Maps as they type (only places on campus come back)
+  useEffect(() => {
+    if (spot !== CUSTOM || picked || custom.trim().length < 2) { setResults([]); return; }
+    const t = setTimeout(async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch(`/api/places?q=${encodeURIComponent(custom.trim())}&session=${session}`, {
+        headers: { authorization: `Bearer ${sess.session?.access_token ?? ''}` },
+      }).catch(() => null);
+      const json = res ? await res.json().catch(() => ({})) : {};
+      if (!res?.ok) { setError(json.error ?? "Couldn't search places."); return; }
+      setError(''); setResults(json.results ?? []);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [custom, spot, picked, session]);
+
+  async function pick(p: { placeId: string; name: string; detail: string }) {
+    setPicked(p); setResults([]); setInfo(null); setChecking(true); setError('');
+    const { data: sess } = await supabase.auth.getSession();
+    const res = await fetch('/api/meetup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${sess.session?.access_token ?? ''}` },
+      body: JSON.stringify({ offerId: id, placeId: p.placeId, name: p.name, session, check: true }),
+    }).catch(() => null);
+    const json = res ? await res.json().catch(() => ({})) : {};
+    setChecking(false);
+    if (!res?.ok) { setError(json.error ?? "Couldn't check that place."); setPicked(null); return; }
+    setInfo({ walkMin: json.walkMin, pickup: json.pickup, address: json.address });
+  }
+
+  function clearPick() {
+    setPicked(null); setInfo(null); setCustom('');
+    setSession(Math.random().toString(36).slice(2) + Date.now().toString(36));
+  }
 
   if (!offer) return <Loading />;
 
   const day = days[dayIdx];
   const slotTime = (h: number) => nyInstant(day.y, day.m, day.d, h);
   const isPast = (h: number) => slotTime(h).getTime() < Date.now() + 30 * 60 * 1000;
-  const spotName = spot === CUSTOM ? custom.trim() : spots.find((s) => s.id === spot)?.short_name;
+  const spotName = spot === CUSTOM ? picked?.name : spots.find((s) => s.id === spot)?.short_name;
   const slotLabel = SLOTS.find((s) => s.h === hour)?.label;
 
   async function save() {
@@ -75,16 +114,16 @@ export default function Meetup() {
     const at = slotTime(hour).toISOString();
     let placeName = spots.find((s) => s.id === spot)?.name ?? '';
     if (spot === CUSTOM) {
-      // A typed-in place: the server checks it's a public spot on Penn's campus, then saves it
+      if (!picked) { setBusy(false); return; }
       const { data: sess } = await supabase.auth.getSession();
       const res = await fetch('/api/meetup', {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${sess.session?.access_token ?? ''}` },
-        body: JSON.stringify({ offerId: id, place: custom.trim(), at }),
+        body: JSON.stringify({ offerId: id, placeId: picked.placeId, name: picked.name, session, at }),
       }).catch(() => null);
       const json = res ? await res.json().catch(() => ({})) : {};
       if (!res?.ok) { setBusy(false); setError(json.error ?? "Couldn't save that place. Try again."); return; }
-      placeName = json.name;
+      placeName = json.pickup ? `${json.name} (pickup)` : json.name;
     } else {
       const { error } = await supabase.rpc('set_meetup', { p_offer: id, p_spot: spot, p_at: at });
       if (error) { setBusy(false); setError(friendlyError(error)); return; }
@@ -147,9 +186,38 @@ export default function Meetup() {
               <span className="radio" />
               <span className="row-title grow">Somewhere else on campus</span>
             </button>
-            {spot === CUSTOM && (
-              <input className="input" autoFocus placeholder="e.g. 1920 Commons, Penn Bookstore" maxLength={80}
-                value={custom} onChange={(e) => setCustom(e.target.value)} />
+            {spot === CUSTOM && !picked && (
+              <div className="stack" style={{ gap: 6 }}>
+                <input className="input" autoFocus placeholder="Search a place or address on campus" maxLength={80}
+                  value={custom} onChange={(e) => setCustom(e.target.value)} />
+                {results.map((r) => (
+                  <button key={r.placeId} onClick={() => pick(r)} className="check-row" style={{ minHeight: 48, border: '1px solid var(--border-soft)' }}>
+                    <span style={{ color: 'var(--muted)', display: 'inline-flex' }}><Icon name="pin" size={18} /></span>
+                    <span className="grow" style={{ minWidth: 0 }}>
+                      <span className="row-title" style={{ display: 'block' }}>{r.name}</span>
+                      <span className="row-sub" style={{ display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.detail}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {spot === CUSTOM && picked && (
+              <div className="card stack" style={{ gap: 6 }}>
+                <div className="spread">
+                  <span style={{ fontSize: 15, fontWeight: 700 }}>{picked.name}</span>
+                  <button className="text-btn" style={{ padding: 0 }} onClick={clearPick}>Change</button>
+                </div>
+                {checking && <span className="meta">Checking…</span>}
+                {info && (
+                  <span className="row" style={{ gap: 8 }}>
+                    {info.walkMin != null && <span className="pill soft">{info.walkMin} min walk</span>}
+                    {info.pickup && <span className="pill pink-tint">Pickup</span>}
+                  </span>
+                )}
+                {info?.pickup && (
+                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Meet at the door or in the lobby. Bring a friend if you can.</span>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -157,8 +225,8 @@ export default function Meetup() {
         {error && <div className="alert"><Icon name="warning" size={18} />{error}</div>}
       </main>
       <div className="action-bar">
-        <button className="btn pink" disabled={hour === null || !spot || (spot === CUSTOM && custom.trim().length < 2) || busy} onClick={save}>
-          {busy && spot === CUSTOM ? 'Checking place…' : hour === null ? 'Pick a time' : `${day.wd} ${slotLabel}${spotName ? ` · ${spotName}` : ''}`}
+        <button className="btn pink" disabled={hour === null || !spot || (spot === CUSTOM && (!picked || !info)) || busy} onClick={save}>
+          {busy ? 'Saving…' : hour === null ? 'Pick a time' : spot === CUSTOM && !picked ? 'Pick a place' : `${day.wd} ${slotLabel}${spotName ? ` · ${spotName}` : ''}`}
         </button>
       </div>
     </>
