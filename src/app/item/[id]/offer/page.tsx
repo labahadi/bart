@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { supabase, getSafeSpots, type SafeSpot } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { friendlyError, type Listing, type Profile } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
@@ -17,9 +17,7 @@ export default function BuildOffer() {
   const [target, setTarget] = useState<Listing | null>(null);
   const [owner, setOwner] = useState<Profile | null>(null);
   const [closet, setCloset] = useState<Listing[] | null>(null);
-  const [spots, setSpots] = useState<SafeSpot[]>([]);
   const [picked, setPicked] = useState<string[]>([]);
-  const [spot, setSpot] = useState<string>('van-pelt');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -29,15 +27,12 @@ export default function BuildOffer() {
       const { data: t } = await supabase.from('listings').select('*').eq('id', id).single();
       if (!t) return;
       setTarget(t as Listing);
-      const [{ data: p }, { data: mineData }, s] = await Promise.all([
+      const [{ data: p }, { data: mineData }] = await Promise.all([
         supabase.from('profiles').select('id,first_name,last_initial').eq('id', t.owner_id).single(),
         supabase.from('listings').select('*').eq('owner_id', me.id).eq('status', 'active').order('created_at', { ascending: false }),
-        getSafeSpots(),
       ]);
       setOwner(p as Profile);
       setCloset((mineData ?? []) as Listing[]);
-      setSpots(s);
-      if (s.length) setSpot(s[0].id);
     })();
   }, [id, me]);
 
@@ -48,7 +43,7 @@ export default function BuildOffer() {
   async function send() {
     setBusy(true); setError('');
     const { data, error } = await supabase.rpc('create_offer', {
-      p_listing: id, p_my_items: picked, p_sweeteners: [], p_spot: spot,
+      p_listing: id, p_my_items: picked, p_sweeteners: [], p_spot: null,
     });
     setBusy(false);
     if (error) setError(friendlyError(error)); else router.replace(`/trades/${data}`);
@@ -90,15 +85,6 @@ export default function BuildOffer() {
 
         <Fairness target={target.id} targetTier={target.tier} items={picked} itemTiers={chosen.map((l) => l.tier)}
           sweeteners={[]} iGive otherName={owner?.first_name ?? 'They'} />
-
-        <div>
-          <p className="label">Meet at</p>
-          <div className="chips wrap">
-            {spots.map((s) => (
-              <button key={s.id} className={`chip ${spot === s.id ? 'on' : ''}`} onClick={() => setSpot(s.id)}>{s.short_name}</button>
-            ))}
-          </div>
-        </div>
 
         {error && <div className="alert"><Icon name="warning" size={18} />{error}</div>}
       </main>

@@ -38,7 +38,7 @@ function calendarLink(o: Offer, spot?: SafeSpot) {
 function shareWithFriend(o: Offer, spot?: SafeSpot) {
   const place = o.meet_address || o.meet_custom || spot?.name || '';
   const when = o.meet_at ? fmtMeet(o.meet_at) : '';
-  const text = `I'm meeting someone from bart for a trade: ${when} at ${place}${o.meet_pickup ? ' (pickup)' : ''}.`;
+  const text = `I'm meeting someone from bart for a trade: ${when} at ${place}.`;
   if (typeof navigator !== 'undefined' && navigator.share) navigator.share({ text }).catch(() => {});
   else window.location.href = `sms:?&body=${encodeURIComponent(text)}`;
 }
@@ -292,7 +292,7 @@ export default function TradeChat() {
               <div className="grow">
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{offer.meet_at ? fmtMeet(offer.meet_at) : 'No time yet'}</div>
                 <div style={{ fontSize: 13, color: 'var(--dark-sub)' }}>
-                  {offer.meet_pickup ? 'Pickup at ' : ''}{offer.meet_custom ?? spot?.name ?? ''}
+                  {offer.meet_custom ?? spot?.name ?? ''}
                   {offer.meet_walk_min != null && ` · ${offer.meet_walk_min} min walk`}
                 </div>
               </div>
@@ -302,9 +302,6 @@ export default function TradeChat() {
                 </Link>
               )}
             </div>
-            {offer.meet_pickup && offer.status === 'accepted' && (
-              <div style={{ fontSize: 13, color: 'var(--dark-sub)' }}>Meet at the door or in the lobby. Bring a friend if you can.</div>
-            )}
             {offer.meet_at && offer.status === 'accepted' && (
               <div className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
                 <a href={directionsUrl({ name: offer.meet_custom ?? spot?.name ?? '', lat: offer.meet_lat, lng: offer.meet_lng })} target="_blank" rel="noreferrer"
