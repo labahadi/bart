@@ -8,6 +8,8 @@ import { uploadChatPhoto } from '@/lib/photos';
 import { blockedAnywhere } from '@/lib/banned';
 import { OFFER_SELECT, displayName, friendlyError, offerGives, sides, turnOf, type Offer } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
+import { clash, freeTimes, type FreeTimes } from '@/lib/calendar';
+import { nyParts } from '@/lib/time';
 import { Icon } from '@/components/Icon';
 import { Handoff } from '@/components/Handoff';
 import { directionsUrl } from '@/lib/campus';
@@ -47,11 +49,13 @@ function calendarLink(o: Offer, myId: string, spot?: SafeSpot) {
   return `https://calendar.google.com/calendar/render?${p}`;
 }
 
-// Send the meetup time and place to a friend (phone share sheet, or a text as a fallback)
-function shareWithFriend(o: Offer, spot?: SafeSpot) {
-  const place = o.meet_address || o.meet_custom || spot?.name || '';
+// Send a friend the plan: a short text plus a link to a page they can open without bart
+async function shareWithFriend(o: Offer, spot?: SafeSpot) {
+  const place = o.meet_custom || spot?.name || o.meet_address || '';
   const when = o.meet_at ? fmtMeet(o.meet_at) : '';
-  const text = `I'm meeting someone from bart for a trade: ${when} at ${place}.`;
+  const { data: token } = await supabase.rpc('share_meetup', { p_offer: o.id });
+  const link = token ? `${window.location.origin}/m/${token}` : '';
+  const text = `Meeting someone from bart: ${when} at ${place}${link ? `\n${link}` : ''}`;
   if (typeof navigator !== 'undefined' && navigator.share) navigator.share({ text }).catch(() => {});
   else window.location.href = `sms:?&body=${encodeURIComponent(text)}`;
 }
@@ -73,6 +77,7 @@ export default function TradeChat() {
   const [error, setError] = useState('');
   const [missing, setMissing] = useState(false);
   const [details, setDetails] = useState(false);
+  const [cal, setCal] = useState<FreeTimes | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -158,6 +163,26 @@ export default function TradeChat() {
     if (error) setError(friendlyError(error));
   }
 
+  // If I'm the one confirming, check the proposed time against my calendar (if linked)
+  const toConfirm = offer && me && offer.status === 'accepted' && offer.meet_at && !offer.meet_confirmed_at && offer.meet_proposed_by !== me.id ? offer.meet_at : null;
+  useEffect(() => {
+    if (!toConfirm) { setCal(null); return; }
+    const d = nyParts(new Date(toConfirm));
+    freeTimes(id, `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`).then(setCal);
+  }, [id, toConfirm]);
+
+  async function confirmMeetup() {
+    if (!offer?.meet_at) return;
+    setBusy(true); setError('');
+    const { error } = await supabase.rpc('confirm_meetup', { p_offer: id });
+    if (error) { setBusy(false); setError(friendlyError(error)); return; }
+    const d = nyParts(new Date(offer.meet_at));
+    const where = offer.meet_custom ?? spots.find((x) => x.id === offer.meet_spot)?.name ?? '';
+    await supabase.from('messages').insert({ offer_id: id, body: `Meetup confirmed: ${d.wd} ${d.m}/${d.d}, ${new Date(offer.meet_at).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' })} at ${where}` });
+    setBusy(false);
+    await loadOffer();
+  }
+
   if (missing) {
     return (
       <main className="screen no-nav" style={{ textAlign: 'center', paddingTop: 120 }}>
@@ -172,6 +197,19 @@ export default function TradeChat() {
   const other = iSent ? offer.to : offer.from;
   const otherName = other?.first_name ?? 'them';
   const spot = spots.find((s) => s.id === offer.meet_spot);
+  const place = offer.meet_custom ?? spot?.short_name ?? '';
+  const pending = !!offer.meet_at && !offer.meet_confirmed_at;
+  const proposedByMe = offer.meet_proposed_by === me.id;
+  const meetShort = offer.meet_at ? new Date(offer.meet_at).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+  const myClash = toConfirm ? clash(new Date(toConfirm), cal, otherName) : null;
+  const confirmButtons = (
+    <div className="row" style={{ gap: 8 }}>
+      <Link href={`/trades/${id}/meetup`} className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }}>
+        Suggest another time
+      </Link>
+      <button className="btn small" disabled={busy} onClick={confirmMeetup}>Confirm</button>
+    </div>
+  );
   const myTurn = offer.status === 'pending' && turnOf(offer) === me.id;
   const canChat = offer.status === 'pending' || offer.status === 'accepted';
 
@@ -207,18 +245,26 @@ export default function TradeChat() {
       <button key="waiting" onClick={() => setDetails(true)} style={{ width: '100%', textAlign: 'left', borderWidth: '0 0 1px 0', borderStyle: 'solid', borderColor: 'var(--border-soft)', background: 'var(--bg)', padding: '10px 20px', fontSize: 13, color: 'var(--muted)' }}>
         Waiting for {otherName}
       </button>
+    ) : offer.status === 'accepted' && pending && !proposedByMe ? (
+      <div key="confirm" className="stack" style={{ gap: 8, padding: '10px 16px 12px', background: 'var(--surface)', borderBottom: '1px solid var(--border-soft)' }}>
+        <span style={{ fontSize: 13 }}><b>{otherName} proposed</b> {meetShort} · {place}</span>
+        {myClash && <span style={{ fontSize: 12, color: 'var(--warn)', fontWeight: 600 }}>{myClash}</span>}
+        {confirmButtons}
+      </div>
+    ) : offer.status === 'accepted' && pending ? (
+      <button key="proposed" onClick={() => setDetails(true)} style={{ width: '100%', textAlign: 'left', borderWidth: '0 0 1px 0', borderStyle: 'solid', borderColor: 'var(--border-soft)', background: 'var(--bg)', padding: '10px 20px', fontSize: 13, color: 'var(--muted)' }}>
+        Waiting for {otherName} to confirm {meetShort} · {place}
+      </button>
     ) : offer.status === 'accepted' ? (
-      <button key="meetup" onClick={() => setDetails(true)} className="spread"
+      <button key="meetup" onClick={() => (offer.meet_at ? setDetails(true) : router.push(`/trades/${id}/meetup`))} className="spread"
         style={{ width: '100%', borderWidth: 0, background: 'var(--ink)', color: '#fff', padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>
         <span className="row" style={{ gap: 8, minWidth: 0 }}>
           <span style={{ color: 'var(--lime)', display: 'inline-flex', flexShrink: 0 }}><Icon name="pin" size={16} /></span>
           <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {offer.meet_at
-              ? `${new Date(offer.meet_at).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', minute: '2-digit' })} · ${offer.meet_custom ?? spot?.short_name ?? ''}`
-              : 'Set the meetup'}
+            {offer.meet_at ? `${meetShort} · ${place}` : 'Propose a meetup'}
           </span>
         </span>
-        <span style={{ color: 'var(--lime)', whiteSpace: 'nowrap', flexShrink: 0 }}>{offer.meet_at ? 'Finish ›' : 'Set ›'}</span>
+        <span style={{ color: 'var(--lime)', whiteSpace: 'nowrap', flexShrink: 0 }}>{offer.meet_at ? 'Finish ›' : 'Propose ›'}</span>
       </button>
     ) : offer.status === 'completed' && !myRating ? (
       <button key="rate" onClick={() => setDetails(true)} className="spread"
@@ -250,7 +296,7 @@ export default function TradeChat() {
         {/* Messages */}
         {messages.map((m) => {
           const mine = m.sender_id === me.id;
-          const system = m.body?.startsWith('Countered: ') || m.body?.startsWith('Meetup set: ');
+          const system = ['Countered: ', 'Meetup set: ', 'Meetup proposed: ', 'Meetup confirmed: '].some((p) => m.body?.startsWith(p));
           if (system) {
             return <p key={m.id} className="meta" style={{ textAlign: 'center', margin: '4px 0' }}>{mine ? 'You' : otherName} · {m.body}</p>;
           }
@@ -308,19 +354,32 @@ export default function TradeChat() {
                   {offer.meet_custom ?? spot?.name ?? ''}
                   {offer.meet_walk_min != null && ` · ${offer.meet_walk_min} min walk`}
                 </div>
+                {offer.status === 'accepted' && offer.meet_at && (
+                  <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4, color: pending ? 'var(--pink-bright)' : 'var(--lime)' }}>
+                    {!pending ? 'Confirmed' : proposedByMe ? `Waiting for ${otherName} to confirm` : `${otherName} proposed this`}
+                  </div>
+                )}
               </div>
               {offer.status === 'accepted' && (
                 <Link href={`/trades/${id}/meetup`} style={{ background: '#fff', color: 'var(--ink)', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 600 }}>
-                  {offer.meet_at ? 'Edit' : 'Set'}
+                  {offer.meet_at ? 'Change' : 'Propose'}
                 </Link>
               )}
             </div>
+            {offer.status === 'accepted' && pending && !proposedByMe && (
+              <div className="stack" style={{ gap: 8 }}>
+                {myClash && <span style={{ fontSize: 12, color: 'var(--pink-bright)', fontWeight: 600 }}>{myClash}</span>}
+                {confirmButtons}
+              </div>
+            )}
             {offer.meet_at && offer.status === 'accepted' && (
               <div className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
                 <a href={directionsUrl({ name: offer.meet_custom ?? spot?.name ?? '', lat: offer.meet_lat, lng: offer.meet_lng })} target="_blank" rel="noreferrer"
                   style={{ color: 'var(--lime)', fontSize: 13, fontWeight: 600 }}>Directions</a>
-                <a href={calendarLink(offer, me.id, spot)} target="_blank" rel="noreferrer"
-                  style={{ color: 'var(--pink-bright)', fontSize: 13, fontWeight: 600 }}>Add to calendar</a>
+                {!pending && (
+                  <a href={calendarLink(offer, me.id, spot)} target="_blank" rel="noreferrer"
+                    style={{ color: 'var(--pink-bright)', fontSize: 13, fontWeight: 600 }}>Add to calendar</a>
+                )}
                 <button onClick={() => shareWithFriend(offer, spot)}
                   style={{ background: 'none', border: 'none', padding: 0, color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'underline', textUnderlineOffset: 3 }}>
                   Share with a friend

@@ -116,6 +116,8 @@ Run each of these once in the Supabase **SQL Editor**, in order, after 0001–00
 | `0012_map_places.sql` | **Somewhere else on campus** now searches **Google Maps**. People pick a real place or address; the server looks up its exact location, refuses anything outside the campus boundary (about 30th–40th St, Market St–Baltimore Ave), and shows the walking time from Locust Walk at 37th. Addresses are fine as long as they're inside the boundary. Every meetup gets **Directions** (opens Apple Maps on iPhone, Google Maps elsewhere) and **Share with a friend**. Replaces the AI place check. |
 | `0013_typed_times.sql` | Meetup times are typed in, to the minute, instead of picked from buttons. A meetup can be set for right now, up to two weeks out. People pick the place by searching Google Maps (no preset spots). |
 | `0014_earlier_start.sql` | Meetups can start as early as **7:30 AM** (latest is still 8:00 PM). |
+| `0015_confirm_and_calendar.sql` | **One person proposes a meetup, the other confirms** (or suggests another time). Changing a confirmed meetup makes it a new proposal. Adds the optional **Google Calendar link** (only busy/free times, never event details) and **Share with a friend** links: a page anyone can open showing the time, place and map, plus what bart is. The page stops working a day after the meetup. |
+| `0016_word_filter.sql` | Blocks **swearing, slurs and threats everywhere**, chat included. Reviewers can **add their own blocked words** (Review reports → Words), which work right away. First names must be one word. |
 
 Then run `npm install` again (the QR code feature added a package).
 
@@ -192,3 +194,22 @@ select status, count(*) from offers group by status;                 -- offers b
 ## Deliberately not built yet
 
 Perfect matches, the campus map, the challenge bar, badges, streaks, notifications and push, phone verification, blocking users, reporting a chat photo, and calendar invites (a Google Calendar link is there instead).
+
+## Google Calendar link (optional)
+
+People can link the Google Calendar for the same email they use for bart. bart only asks Google for busy/free times, never event names. Without this setup, everything else works and the link option just doesn't appear.
+
+1. Google Cloud console, same project as the Maps key → **APIs & Services → Library** → enable **Google Calendar API**.
+2. **APIs & Services → OAuth consent screen** (Google Auth Platform): app name *bart*, support email, audience **External**. Under **Data access**, add the scope `.../auth/calendar.freebusy`. Under **Audience → Test users**, add the email of everyone in the beta (up to 100) while the app is in Testing.
+3. **Credentials → Create credentials → OAuth client ID → Web application.** Authorized redirect URIs:
+   - `https://bart-sand.vercel.app/api/calendar/callback`
+   - `http://localhost:3000/api/calendar/callback`
+4. Copy the client ID and secret into Vercel (and `.env.local`) as `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`, then redeploy.
+
+The Google account must match the bart email. If a school's email isn't a Google account (or the school blocks outside apps), linking says so and nothing is saved.
+
+## Text checks
+
+- **Word list (chat, comments, names, listings, ISO):** enforced by the database, so nothing gets around it. Reviewers add words under Review reports → Words.
+- **AI check (listings, ISO posts, comments, trade notes; not chat):** before posting, `/api/screen` asks Claude whether the text has a private person's full name or nasty language the list missed. Public figures, authors and brands are fine ("Taylor Swift tickets"). It runs in the app before saving, so if the AI is down, posts still go through with the word list.
+

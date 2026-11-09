@@ -65,7 +65,7 @@ export async function POST(req: Request) {
       method: 'POST',
       headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: MODEL, max_tokens: 80, system: RULES,
+        model: MODEL, max_tokens: 1024, system: RULES,
         messages: [{ role: 'user', content: [
           { type: 'image', source: { type: 'base64', media_type: file.type, data: bytes.toString('base64') } },
           { type: 'text', text: `This is a ${kind === 'chat' ? 'CHAT' : 'LISTING'} photo. Is it allowed?` },

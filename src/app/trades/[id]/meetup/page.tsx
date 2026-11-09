@@ -1,40 +1,26 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { OFFER_SELECT, type Offer } from '@/lib/trade';
 import { Icon } from '@/components/Icon';
 import { Loading, PushHeader } from '@/components/ui';
+import { useAuth } from '@/components/AuthProvider';
+import { clock, hhmm, nyInstant, nyParts } from '@/lib/time';
+import { clash, freeTimes, linkCalendar, linkResult, type FreeTimes } from '@/lib/calendar';
 
-const TZ = 'America/New_York';
 // "16:15" -> "4:15 PM"
-function label12(hhmm: string) {
-  const [h, m] = hhmm.split(':').map(Number);
+function label12(t: string) {
+  const [h, m] = t.split(':').map(Number);
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
-}
-
-// Philadelphia calendar date parts for a Date
-function nyParts(d: Date) {
-  const p = new Intl.DateTimeFormat('en-US', { timeZone: TZ, year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', hourCycle: 'h23', weekday: 'short' })
-    .formatToParts(d).reduce<Record<string, string>>((a, x) => ({ ...a, [x.type]: x.value }), {});
-  return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour, wd: p.weekday };
-}
-
-// The instant that is hour:minute Philadelphia time on the given date (handles daylight saving)
-function nyInstant(y: number, m: number, d: number, hour: number, minute = 0) {
-  let t = Date.UTC(y, m - 1, d, hour + 5, minute);
-  for (let i = 0; i < 2; i++) {
-    const p = nyParts(new Date(t));
-    const diff = (Date.UTC(p.y, p.m - 1, p.d, p.h) - Date.UTC(y, m - 1, d, hour)) / 3600000;
-    t -= diff * 3600000;
-  }
-  return new Date(t);
 }
 
 export default function Meetup() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const search = useSearchParams();
+  const { me } = useAuth();
   const [offer, setOffer] = useState<Offer | null>(null);
   const [dayIdx, setDayIdx] = useState(0);
   const [time, setTime] = useState(''); // "HH:MM", 24-hour
@@ -48,6 +34,8 @@ export default function Meetup() {
   const [session, setSession] = useState(newSession);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [cal, setCal] = useState<FreeTimes | null>(null);
+  const [calNote] = useState(() => linkResult(search.get('calendar')));
 
   // Today plus the next 6 days, Philadelphia time
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => nyParts(new Date(Date.now() + i * 86400000))), []);
@@ -56,6 +44,16 @@ export default function Meetup() {
     supabase.from('offers').select(OFFER_SELECT).eq('id', id).single()
       .then(({ data }) => setOffer(data as unknown as Offer));
   }, [id]);
+
+  // Free times for the chosen day (only if someone linked a calendar)
+  useEffect(() => {
+    const d = days[dayIdx];
+    const date = `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+    let live = true;
+    setCal(null);
+    freeTimes(id, date).then((t) => { if (live) setCal(t); });
+    return () => { live = false; };
+  }, [id, dayIdx, days]);
 
   // Search Google Maps as they type (only places on campus come back)
   useEffect(() => {
@@ -80,6 +78,10 @@ export default function Meetup() {
   const timeProblem = !at ? '' : time < '07:30' || time > '20:00' ? 'Meetups are between 7:30 AM and 8 PM.'
     : at.getTime() < Date.now() - 5 * 60 * 1000 ? 'That time already passed.' : '';
   const timeOk = !!at && !timeProblem;
+  const otherName = (offer.from_user === me?.id ? offer.to : offer.from)?.first_name ?? 'They';
+  const conflict = at && timeOk ? clash(at, cal, otherName) : null;
+  const anyLinked = !!cal && (cal.me.linked || cal.them.linked);
+  const freeLabel = cal?.me.linked && cal.them.linked ? 'Free for both of you' : cal?.me.linked ? "You're free" : `${otherName} is free`;
   const timeLabel = time ? label12(time) : '';
 
   async function api(body: Record<string, unknown>) {
@@ -113,14 +115,14 @@ export default function Meetup() {
     setBusy(false);
     if (!ok) { setError(json.error ?? "Couldn't save that place. Try again."); return; }
     // Drop a note in the chat so the other person sees the change
-    await supabase.from('messages').insert({ offer_id: id, body: `Meetup set: ${day.wd} ${day.m}/${day.d}, ${timeLabel} at ${json.name}` });
+    await supabase.from('messages').insert({ offer_id: id, body: `Meetup proposed: ${day.wd} ${day.m}/${day.d}, ${timeLabel} at ${json.name}` });
     router.replace(`/trades/${id}`);
   }
 
   return (
     <>
       <main className="screen no-nav">
-        <PushHeader title="Meetup" back={`/trades/${id}`} />
+        <PushHeader title="Propose a meetup" back={`/trades/${id}`} />
 
         <div>
           <p className="label">Day</p>
@@ -135,11 +137,44 @@ export default function Meetup() {
           </div>
         </div>
 
+        {calNote && (
+          <div className={calNote.ok ? 'toast' : 'alert'}>
+            {!calNote.ok && <Icon name="warning" size={18} />}{calNote.text}
+          </div>
+        )}
+
+        {anyLinked ? (
+          <div>
+            <p className="label">{freeLabel}</p>
+            {cal!.free.length === 0 ? (
+              <p className="meta" style={{ margin: 0 }}>No open time this day. Try another day.</p>
+            ) : (
+              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                {cal!.free.map((w) => (
+                  <button key={w.start} className="pill" onClick={() => setTime(hhmm(w.start))}
+                    style={{ height: 36, padding: '0 12px', fontSize: 13, fontWeight: 600, background: 'var(--lime)', color: 'var(--ink)', border: 'none' }}>
+                    {clock(w.start)} – {clock(w.until ?? w.end)}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!cal!.me.linked && !cal!.off && (
+              <button className="text-btn" style={{ padding: 0, marginTop: 8 }}
+                onClick={async () => setError(await linkCalendar(`/trades/${id}/meetup`))}>Link your Google Calendar too</button>
+            )}
+          </div>
+        ) : cal && !cal.off && (
+          <button className="text-btn" style={{ padding: 0, alignSelf: 'flex-start' }}
+            onClick={async () => setError(await linkCalendar(`/trades/${id}/meetup`))}>
+            <Icon name="calendar" size={16} /> Link your Google Calendar to see free times
+          </button>
+        )}
+
         <div>
           <label className="label" htmlFor="time" style={{ display: 'block' }}>Time</label>
           <input id="time" type="time" className={`input ${timeProblem ? 'invalid' : ''}`} min="07:30" max="20:00"
             value={time} onChange={(e) => setTime(e.target.value)} style={{ height: 52, fontSize: 17 }} />
-          <p className={timeProblem ? 'error-text' : 'meta'} style={{ marginTop: 6 }}>{timeProblem || 'Any time from 7:30 AM to 8 PM'}</p>
+          <p className={timeProblem ? 'error-text' : 'meta'} style={{ marginTop: 6, ...(conflict && !timeProblem ? { color: 'var(--warn)', fontWeight: 600 } : {}) }}>{timeProblem || conflict || 'Any time from 7:30 AM to 8 PM'}</p>
         </div>
 
         <div>
@@ -173,7 +208,7 @@ export default function Meetup() {
       </main>
       <div className="action-bar">
         <button className="btn pink" disabled={!timeOk || !picked || checking || busy} onClick={save}>
-          {busy ? 'Saving…' : !timeOk ? 'Pick a time' : !picked ? 'Pick a place' : `${day.wd} ${timeLabel} · ${picked.name}`}
+          {busy ? 'Sending…' : !timeOk ? 'Pick a time' : !picked ? 'Pick a place' : `Propose ${day.wd} ${timeLabel} · ${picked.name}`}
         </button>
       </div>
     </>

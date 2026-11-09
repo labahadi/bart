@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { bannedMatch } from '@/lib/banned';
+import { screenText } from '@/lib/screen';
 import { friendlyError } from '@/lib/trade';
 
 // After a trade is finished: post it to the Campus feed (once per trade, either person can)
@@ -21,6 +22,8 @@ export function ShareTrade({ offerId }: { offerId: string }) {
   async function share() {
     if (bannedMatch(note)) { setError('That includes a banned word.'); return; }
     setBusy(true); setError('');
+    const problem = await screenText(note);
+    if (problem) { setBusy(false); setError(problem); return; }
     const { error } = await supabase.rpc('share_trade', { p_offer: offerId, p_note: note.trim() || null });
     setBusy(false);
     if (error && !/already/i.test(error.message)) setError(friendlyError(error)); else setShared(true);

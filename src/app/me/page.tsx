@@ -9,6 +9,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Avatar, BottomNav } from '@/components/ui';
 import { useNotifications } from '@/components/Notifications';
+import { linkCalendar, linkResult, myCalendar, unlinkCalendar } from '@/lib/calendar';
 
 const STATUS_LABEL: Record<Listing['status'], string> = {
   active: 'Live', in_trade: 'In a trade', traded: 'Traded', removed: 'Taken down',
@@ -24,6 +25,17 @@ export default function Me() {
   const [saved, setSaved] = useState<Listing[]>([]);
   const [stats, setStats] = useState<{ rating: number | null; trades: number } | null>(null);
   const [reviewer, setReviewer] = useState(false);
+  const [calendar, setCalendar] = useState<{ account_email: string } | null | undefined>(undefined);
+  const [calBusy, setCalBusy] = useState(false);
+  const [calNote, setCalNote] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Coming back from Google: say how it went, then tidy the address bar
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('calendar');
+    if (!code) return;
+    setCalNote(linkResult(code));
+    window.history.replaceState(null, '', '/me');
+  }, []);
 
   useEffect(() => {
     if (!me) return;
@@ -33,6 +45,7 @@ export default function Me() {
       .then(({ data }) => setSaved(((data ?? []) as unknown as { listing: Listing | null }[]).map((s) => s.listing).filter(Boolean) as Listing[]));
     supabase.rpc('trader_stats', { p_user: me.id }).then(({ data }) => setStats(data?.[0] ?? null));
     supabase.rpc('is_reviewer').then(({ data }) => setReviewer(data === true));
+    myCalendar().then(setCalendar);
   }, [me]);
 
   async function signOut() {
@@ -90,6 +103,27 @@ export default function Me() {
               <span className="meta">{l.tier} · {STATUS_LABEL[l.status]}</span>
             </Link>
           ))}
+        </div>
+
+        <div className="card stack" style={{ gap: 8 }}>
+          <div className="spread">
+            <span className="row" style={{ gap: 10, fontWeight: 600, fontSize: 14 }}><Icon name="calendar" size={20} /> Google Calendar</span>
+            {calendar === undefined ? null : calendar ? (
+              <button className="text-btn" style={{ padding: 0, color: 'var(--muted)' }} disabled={calBusy}
+                onClick={async () => { setCalBusy(true); await unlinkCalendar(); setCalendar(null); setCalBusy(false); setCalNote(null); }}>
+                Unlink
+              </button>
+            ) : (
+              <button className="text-btn" style={{ padding: 0 }} disabled={calBusy}
+                onClick={async () => { setCalBusy(true); const err = await linkCalendar('/me'); if (err) { setCalNote({ ok: false, text: err }); setCalBusy(false); } }}>
+                Link
+              </button>
+            )}
+          </div>
+          <p className="meta" style={{ margin: 0 }}>
+            {calendar ? `Linked to ${calendar.account_email}. bart only sees when you're busy.` : 'Optional. Shows when you and the other person are both free.'}
+          </p>
+          {calNote && <p className="meta" style={{ margin: 0, color: calNote.ok ? 'var(--ink)' : 'var(--error)', fontWeight: 600 }}>{calNote.text}</p>}
         </div>
 
         {reviewer && (

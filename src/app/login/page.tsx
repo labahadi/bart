@@ -104,7 +104,7 @@ export default function SignUp() {
   }
 
   const allAgreed = agreed.every(Boolean);
-  const nameOk = first.trim().length >= 1 && /^[a-z]$/i.test(lastInitial.trim()) && !blockedAnywhere(first);
+  const nameOk = first.trim().length >= 1 && !/\s/.test(first.trim()) && /^[a-z]$/i.test(lastInitial.trim()) && !blockedAnywhere(first);
 
   return (
     <main style={{ padding: '40px 24px 40px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: '100dvh' }}>
@@ -188,6 +188,7 @@ export default function SignUp() {
               <label className="label" htmlFor="first" style={{ display: 'block' }}>First name</label>
               <input id="first" className="input" autoComplete="given-name" maxLength={40}
                 value={first} onChange={(e) => setFirst(e.target.value)} />
+              {/\s/.test(first.trim()) && <p className="error-text">Just your first name, as one word.</p>}
             </div>
             <div style={{ width: 96 }}>
               <label className="label" htmlFor="last" style={{ display: 'block' }}>Last initial</label>

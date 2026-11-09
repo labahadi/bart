@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { supabase, photoUrl } from '@/lib/supabase';
 import { uploadPhoto } from '@/lib/photos';
 import { bannedMatch } from '@/lib/banned';
+import { screenText } from '@/lib/screen';
 import { CATEGORIES, type Category, type Tier, friendlyError } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
@@ -82,6 +83,8 @@ export function ListingForm({ editId }: { editId?: string }) {
       wants: wants.trim() || null,
       photo_paths: photos,
     };
+    const problem = await screenText(fields.title, fields.description, fields.wants);
+    if (problem) { setBusy(false); setError(problem); return; }
     const { error } = editId
       ? await supabase.from('listings').update(fields).eq('id', editId)
       : await supabase.from('listings').insert(fields);

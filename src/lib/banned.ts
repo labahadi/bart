@@ -9,7 +9,20 @@ export const EVERYWHERE: Term[] = [
   'nude', 'nudes', 'naked', 'sex', 'sexy', 'sexting', 'porn', 'porno', 'onlyfans', 'hookup', 'horny', 'nsfw',
   'xxx', 'dick', 'cock', 'pussy', 'boobs', 'tits', 'titties', 'blowjob', 'handjob', 'orgasm', 'fetish', 'kinky',
   'milf', 'thot', 'send pics', 'dick pic',
-].map((term) => ({ term, kind: 'adult content' }));
+].map((term) => ({ term, kind: 'adult content' })).concat([
+  'fuck', 'fucking', 'fucker', 'fucked', 'motherfucker', 'fck', 'fuk', 'stfu', 'shit', 'shitty', 'bullshit',
+  'bitch', 'cunt', 'asshole', 'dickhead', 'bastard', 'whore', 'slut', 'hoe',
+  'retard', 'retarded', 'faggot', 'fag', 'nigger', 'nigga', 'chink', 'spic', 'kike', 'tranny', 'dyke', 'wetback', 'gook', 'raghead',
+  'kys', 'kill yourself', 'kill you',
+].map((term) => ({ term, kind: 'language' })));
+
+// Words reviewers added in the app (loaded once after sign-in; the database enforces them either way)
+let extraEverywhere: Term[] = [];
+let extraListings: Term[] = [];
+export function setExtraTerms(rows: { term: string; everywhere: boolean }[]) {
+  extraEverywhere = rows.filter((r) => r.everywhere).map((r) => ({ term: r.term, kind: 'blocked' }));
+  extraListings = rows.filter((r) => !r.everywhere).map((r) => ({ term: r.term, kind: 'blocked' }));
+}
 
 // Blocked on listings and the ISO board only (fine to mention in chat: "after my exam")
 export const LISTINGS_ONLY: Term[] = [
@@ -44,6 +57,6 @@ function match(text: string, list: Term[]): Term | null {
 }
 
 /** Listings and ISO posts: both lists */
-export const bannedMatch = (text: string) => match(text, [...EVERYWHERE, ...LISTINGS_ONLY]);
+export const bannedMatch = (text: string) => match(text, [...EVERYWHERE, ...LISTINGS_ONLY, ...extraEverywhere, ...extraListings]);
 /** Chat, comments, names, notes: the everywhere list */
-export const blockedAnywhere = (text: string) => match(text, EVERYWHERE);
+export const blockedAnywhere = (text: string) => match(text, [...EVERYWHERE, ...extraEverywhere]);

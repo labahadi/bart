@@ -27,7 +27,7 @@ const ago = (iso: string) => {
 };
 
 export default function ReportQueue() {
-  const [tab, setTab] = useState<'open' | 'chats' | 'paused' | 'all'>('open');
+  const [tab, setTab] = useState<'open' | 'chats' | 'paused' | 'words' | 'all'>('open');
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -60,11 +60,13 @@ export default function ReportQueue() {
         </button>
         <button className={tab === 'chats' ? 'on' : ''} onClick={() => setTab('chats')}>Chats</button>
         <button className={tab === 'paused' ? 'on' : ''} onClick={() => setTab('paused')}>Paused</button>
+        <button className={tab === 'words' ? 'on' : ''} onClick={() => setTab('words')}>Words</button>
         <button className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>All</button>
       </div>
 
       {tab === 'chats' && <ChatReports />}
       {tab === 'paused' && <PausedAccounts />}
+      {tab === 'words' && <BlockedWords />}
 
       {done && <div className="toast">{done}</div>}
       {error && <div className="alert"><Icon name="warning" size={18} />{error}</div>}
@@ -323,5 +325,68 @@ function PausedAccounts() {
         </div>
       ))}
     </>
+  );
+}
+
+// Words reviewers block on top of the built-in list. They work right away, everywhere the list applies.
+function BlockedWords() {
+  const [rows, setRows] = useState<{ term: string; everywhere: boolean; custom: boolean }[] | null>(null);
+  const [word, setWord] = useState('');
+  const [everywhere, setEverywhere] = useState(true);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const { data, error } = await supabase.rpc('banned_term_list');
+    if (error) setError(friendlyError(error)); else setRows(data ?? []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function add() {
+    if (!word.trim()) return;
+    setBusy(true); setError('');
+    const { error } = await supabase.rpc('add_banned_term', { p_term: word, p_everywhere: everywhere });
+    setBusy(false);
+    if (error) { setError(friendlyError(error)); return; }
+    setWord(''); load();
+  }
+
+  async function remove(term: string) {
+    const { error } = await supabase.rpc('remove_banned_term', { p_term: term });
+    if (error) setError(friendlyError(error)); else load();
+  }
+
+  const custom = (rows ?? []).filter((r) => r.custom);
+  const builtIn = (rows ?? []).filter((r) => !r.custom).length;
+
+  return (
+    <div className="stack" style={{ gap: 12 }}>
+      <div className="card stack" style={{ gap: 10 }}>
+        <input className="input" placeholder="Word or phrase to block" maxLength={40} value={word}
+          onChange={(e) => setWord(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} />
+        <div className="segmented">
+          <button className={everywhere ? 'on' : ''} onClick={() => setEverywhere(true)}>Everywhere</button>
+          <button className={!everywhere ? 'on' : ''} onClick={() => setEverywhere(false)}>Listings and ISO only</button>
+        </div>
+        <button className="btn" disabled={!word.trim() || busy} onClick={add}>{busy ? 'Adding…' : 'Block it'}</button>
+        <p className="meta" style={{ margin: 0 }}>
+          Everywhere covers chat, comments, names, notes, listings and ISO posts. Plurals and spellings like 0 for o are caught too.
+        </p>
+      </div>
+
+      {error && <div className="alert"><Icon name="warning" size={18} />{error}</div>}
+
+      {rows && custom.length === 0 && <div className="empty">No words added yet.</div>}
+      {custom.map((r) => (
+        <div key={r.term} className="spread card" style={{ padding: '10px 14px' }}>
+          <span className="stack" style={{ gap: 2 }}>
+            <span style={{ fontSize: 15, fontWeight: 600 }}>{r.term}</span>
+            <span className="meta">{r.everywhere ? 'Everywhere' : 'Listings and ISO only'}</span>
+          </span>
+          <button className="text-btn" style={{ padding: 0, color: 'var(--muted)' }} onClick={() => remove(r.term)}>Remove</button>
+        </div>
+      ))}
+      {rows && <p className="meta" style={{ textAlign: 'center' }}>Plus {builtIn} built-in words that can&apos;t be removed here.</p>}
+    </div>
   );
 }

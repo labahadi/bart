@@ -5,9 +5,9 @@ set client_min_messages = warning;
 \o /dev/null
 
 create schema t;
-grant usage on schema t to authenticated;
+grant usage on schema t to authenticated, anon;
 create table t.results (n serial, name text, ok boolean, detail text);
-grant all on t.results to authenticated; grant usage on sequence t.results_n_seq to authenticated;
+grant all on t.results to authenticated, anon; grant usage on sequence t.results_n_seq to authenticated, anon;
 
 -- run SQL, expect it to fail with a message matching pattern
 create function t.expect_error(name text, q text, pattern text) returns void language plpgsql as $$
@@ -22,7 +22,7 @@ end $$;
 create function t.expect(name text, cond boolean, detail text default null) returns void language sql as $$
   insert into t.results (name, ok, detail) values (name, coalesce(cond, false), detail)
 $$;
-grant execute on all functions in schema t to authenticated;
+grant execute on all functions in schema t to authenticated, anon;
 
 create function t.as_user(u uuid) returns void language plpgsql as $$
 begin perform set_config('request.jwt.claim.sub', u::text, false); end $$;
@@ -171,6 +171,49 @@ select set_meetup((select offer_id from ids), 'houston',
   (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 16 hours') at time zone 'America/New_York');
 select t.expect('4 PM meetup saved', (select meet_spot = 'houston' from offers where id = (select offer_id from ids)));
 
+-- Propose and confirm: Alex just set it, so it's a proposal from Alex
+select t.expect('new meetup is a proposal from Alex', (select meet_proposed_by = '00000000-0000-0000-0000-00000000000a' and meet_confirmed_at is null from offers where id = (select offer_id from ids)));
+select t.expect_error('proposer cannot confirm their own', format($$select confirm_meetup(%L)$$, (select offer_id from ids)), 'other person confirms');
+select t.as_user('00000000-0000-0000-0000-00000000000b');
+select t.expect('Jordan was told about the proposal', exists (select 1 from notifications where user_id = auth.uid() and kind = 'meetup' and body like '%proposed a meetup%'));
+select confirm_meetup((select offer_id from ids));
+select t.expect('Jordan confirmed', (select meet_confirmed_at is not null from offers where id = (select offer_id from ids)));
+select t.as_user('00000000-0000-0000-0000-00000000000c');
+select t.expect_error('outsider cannot confirm', format($$select confirm_meetup(%L)$$, (select offer_id from ids)), 'not found');
+select t.as_user('00000000-0000-0000-0000-00000000000b');
+select set_meetup((select offer_id from ids), 'van-pelt',
+  (date_trunc('day', now() at time zone 'America/New_York') + interval '3 days 11 hours') at time zone 'America/New_York');
+select t.expect('changing it makes a new proposal from Jordan', (select meet_proposed_by = '00000000-0000-0000-0000-00000000000b' and meet_confirmed_at is null from offers where id = (select offer_id from ids)));
+select t.as_user('00000000-0000-0000-0000-00000000000a');
+select confirm_meetup((select offer_id from ids));
+select t.expect('Alex confirmed the new time', (select meet_confirmed_at is not null from offers where id = (select offer_id from ids)));
+select t.expect_error('people cannot write calendar tokens directly',
+  $$insert into calendar_links (user_id, account_email, refresh_token) values (auth.uid(), 'x@upenn.edu', 'secret')$$, 'row-level security');
+select t.expect('people cannot read calendar tokens', not exists (select 1 from calendar_links));
+select t.expect('my_calendar is empty until linked', not exists (select 1 from my_calendar()));
+
+-- Share with a friend: a link anyone can open, showing only the plan
+create temp table share_tok as select share_meetup((select offer_id from ids)) as t;
+grant select on share_tok to public;
+select t.expect('same link every time', (select share_meetup((select offer_id from ids)) = (select t from share_tok)));
+set role anon;
+select t.expect('a friend with the link sees the plan',
+  (select first_name = 'Alex' and confirmed and place is not null and gives is not null and gets is not null from shared_meetup((select t from share_tok))));
+select t.expect('a made-up link shows nothing', not exists (select 1 from shared_meetup('nope')));
+select t.expect('the friend cannot list share links', not exists (select 1 from meetup_shares));
+set role authenticated;
+select t.as_user('00000000-0000-0000-0000-00000000000c');
+select t.expect_error('an outsider cannot make a link', format($$select share_meetup(%L)$$, (select offer_id from ids)), 'not found');
+select t.as_user('00000000-0000-0000-0000-00000000000a');
+
+-- Word filter: swearing blocked everywhere, reviewers add words, names are one word
+select t.expect_error('swearing blocked in chat',
+  format($$insert into messages (offer_id, body) values (%L, 'this is bullsh1t')$$, (select offer_id from ids)), 'row-level security');
+select t.expect('swearing caught with disguises', blocked_anywhere('f u c k') is null and blocked_anywhere('fuuuck') is not null);
+select t.expect('normal words still fine', blocked_anywhere('Shoe rack, Scunthorpe hoodie, class notes') is null);
+select t.expect_error('non-reviewer cannot add words', $$select add_banned_term('zorp')$$, 'reviewers');
+select t.expect_error('one-word first names', $$select complete_signup('Alex Smith', 'k')$$, 'one word');
+
 -- Completion and rating
 select t.expect_error('cannot rate before confirming', format($$select rate_trade(%L, 5)$$, (select offer_id from ids)), 'complete first');
 select t.expect('first confirm keeps it accepted', (select confirm_complete((select offer_id from ids)) = 'accepted'));
@@ -224,6 +267,12 @@ select t.expect('queue has no reporter identities',
   not exists (select 1 from information_schema.routines r join information_schema.parameters p
               on p.specific_name = r.specific_name
               where r.routine_name = 'report_queue' and p.parameter_name ilike '%reporter%'));
+select add_banned_term('Zorpium', true);
+select t.expect('reviewer-added word blocks right away', blocked_anywhere('selling ZORPIUM cheap') = 'zorpium');
+select remove_banned_term('fuck');
+select t.expect('built-in words cannot be removed', blocked_anywhere('fuck') is not null);
+select remove_banned_term('zorpium');
+select t.expect('reviewer-added word can be removed', blocked_anywhere('zorpium') is null);
 select resolve_report('30000000-0000-0000-0000-000000000001', 'keep');
 select t.expect('keep restores the listing', (select status = 'active' from listings where id = '30000000-0000-0000-0000-000000000001'));
 select t.expect('resolved reports leave the open queue', not exists (select 1 from report_queue()));
@@ -489,7 +538,7 @@ select set_meetup_place((select offer_id from late_offer), '00000000-0000-0000-0
 select t.expect('on-campus address saved as a pickup',
   (select meet_custom = '4012 Pine St' and meet_pickup and meet_walk_min = 6 and meet_spot is null from offers where id = (select offer_id from late_offer)));
 select t.expect('the other person is told, not the one who set it',
-  exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-00000000000a' and kind = 'meetup' and body like 'Jordan set the meetup%')
+  exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-00000000000a' and kind = 'meetup' and body like 'Jordan proposed a meetup%')
   and not exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-00000000000b' and kind = 'meetup' and ref = (select offer_id from late_offer)));
 set role authenticated;
 select t.as_user('00000000-0000-0000-0000-00000000000b');

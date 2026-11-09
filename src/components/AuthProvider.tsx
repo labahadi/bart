@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 import { usePathname, useRouter } from 'next/navigation';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { setExtraTerms } from '@/lib/banned';
 import { Loading } from './ui';
 import { NotificationsProvider } from './Notifications';
 
@@ -34,6 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .is('lifted_at', null).order('created_at', { ascending: false }).limit(5);
     const active = ((pauses ?? []) as { until: string | null }[]).find((x) => !x.until || new Date(x.until) > new Date());
     setPausedUntil(active ? (active.until ?? null) : undefined);
+    // Words reviewers added, so typing shows the warning right away
+    supabase.rpc('banned_term_list').then(({ data }) => { if (data) setExtraTerms((data as { term: string; everywhere: boolean; custom: boolean }[]).filter((r) => r.custom)); });
   }, []);
 
   useEffect(() => {
@@ -51,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadProfile]);
 
   // Signed out, or hasn't agreed to the house rules yet -> sign-up flow
-  const needsLogin = ready && !PUBLIC.includes(path) && (!session || !me?.rules_accepted_at);
+  const needsLogin = ready && !PUBLIC.includes(path) && !path.startsWith('/m/') && (!session || !me?.rules_accepted_at);
   // Keep any #error=... from an email link so the sign-up screen can explain it
   useEffect(() => {
     if (!needsLogin) return;
@@ -62,6 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => { await loadProfile(session); }, [loadProfile, session]);
 
+  // Shared meetup links (/m/...) open for anyone, signed in or not
+  if (path.startsWith('/m/') && !session) return <>{children}</>;
   if (!ready || needsLogin) return <Loading />;
   return (
     <AuthContext.Provider value={{ session, me, ready, refresh }}>

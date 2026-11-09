@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { bannedMatch, blockedAnywhere } from '@/lib/banned';
+import { screenText } from '@/lib/screen';
 import { friendlyError, type Listing, type Profile } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
@@ -175,6 +176,8 @@ function Comments({ postId, onCount }: { postId: string; onCount: (n: number) =>
     if (!body) return;
     if (blockedAnywhere(body)) { setError("That includes words that aren't allowed on bart."); return; }
     setError(''); setText('');
+    const problem = await screenText(body);
+    if (problem) { setError(problem); setText(body); return; }
     const { error } = await supabase.from('post_comments').insert({ post_id: postId, body });
     if (error) { setError(friendlyError(error)); setText(body); return; }
     load();
@@ -241,6 +244,8 @@ function IsoBoard() {
 
   async function post() {
     setError('');
+    const problem = await screenText(want, canOffer);
+    if (problem) { setError(problem); return; }
     const { error } = await supabase.from('iso_posts').insert({ want: want.trim(), can_offer: canOffer.trim() || null });
     if (error) { setError(friendlyError(error)); return; }
     setWant(''); setCanOffer(''); setComposing(false); load();
