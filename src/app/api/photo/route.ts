@@ -10,11 +10,13 @@ const MODEL = 'claude-haiku-5-5';
 const OK_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 const RULES = `You check photos uploaded to bart, a campus trading app for college students, before anyone else sees them.
-NOT allowed in any photo: nudity or partial nudity; sexual content, sexual poses or gestures; sexualized photos of people in underwear or swimwear; genitals (even covered or drawn); sex toys; graphic violence or gore; hate symbols.
-ALSO not allowed in LISTING photos: drugs or drug gear, vapes, alcohol, weapons, fake IDs, exams or answer keys.
-Allowed: ordinary photos of items, clothing laid out or worn normally, fully clothed people, rooms, screenshots of ordinary things.
-When unsure whether something is sexual, do not allow it.
-Reply with JSON only: {"allowed": true | false, "category": "none" | "sexual" | "violence" | "hate" | "banned_item"}`;
+Block a photo only for these reasons:
+- "sexual": nudity or partial nudity, sexual content, poses or gestures, sexualized photos of people in underwear or swimwear, genitals (even covered or drawn), sex toys. For this reason only, block when unsure.
+- "violence": graphic violence or gore.
+- "hate": hate symbols.
+- LISTING photos only, "banned_item": the main subject is drugs or drug gear, a vape, alcohol, a weapon, a fake ID, or an exam/answer key.
+Everything else is allowed, including: messy rooms, a bottle or can that is not the item being traded, kitchen knives in the background, posters, clothing laid out or worn normally, fully clothed people, screenshots, blurry or dark photos. For violence, hate and banned items, block only when it is clearly there.
+Reply with JSON only: {"allowed": true | false, "category": "none" | "sexual" | "violence" | "hate" | "banned_item", "what": "<3-6 words naming what you saw, only if blocked>"}`;
 
 const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
 
@@ -57,34 +59,47 @@ export async function POST(req: Request) {
 
   const bytes = Buffer.from(await file.arrayBuffer());
 
-  // The check
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model: MODEL, max_tokens: 60, system: RULES,
-      messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: file.type, data: bytes.toString('base64') } },
-        { type: 'text', text: `This is a ${kind === 'chat' ? 'CHAT' : 'LISTING'} photo. Is it allowed?` },
-      ] }],
-    }),
-  }).catch(() => null);
-  if (!res?.ok) {
-    console.error('Photo check failed', res?.status, await res?.text().catch(() => ''));
-    return NextResponse.json({ error: "Couldn't check this photo. Try again." }, { status: 502 });
-  }
-  const text: string = (await res.json())?.content?.find((c: { type: string }) => c.type === 'text')?.text ?? '';
-  let verdict: { allowed?: boolean; category?: string } = {};
-  try { verdict = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)); } catch { /* treated as not allowed */ }
+  // The check (asked twice if the first answer can't be read)
+  const ask = async () => {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL, max_tokens: 80, system: RULES,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: file.type, data: bytes.toString('base64') } },
+          { type: 'text', text: `This is a ${kind === 'chat' ? 'CHAT' : 'LISTING'} photo. Is it allowed?` },
+        ] }],
+      }),
+    }).catch(() => null);
+    if (!res?.ok) {
+      console.error('Photo check failed', res?.status, await res?.text().catch(() => ''));
+      return null;
+    }
+    const text: string = (await res.json())?.content?.find((c: { type: string }) => c.type === 'text')?.text ?? '';
+    try {
+      const v = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+      return typeof v.allowed === 'boolean' ? (v as { allowed: boolean; category?: string; what?: string }) : null;
+    } catch { return null; }
+  };
+  const verdict = (await ask()) ?? (await ask());
+  if (!verdict) return NextResponse.json({ error: "Couldn't check this photo. Try again." }, { status: 502 });
 
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
 
-  if (verdict.allowed !== true) {
+  if (!verdict.allowed) {
     // Keep a record so the team can spot repeat attempts
     await admin.from('photo_blocks').insert({
-      user_id: userId, kind, category: verdict.category ?? 'unclear', offer_id: kind === 'chat' ? offerId : null,
+      user_id: userId, kind, category: [verdict.category, verdict.what].filter(Boolean).join(': ') || 'unclear',
+      offer_id: kind === 'chat' ? offerId : null,
     });
-    return NextResponse.json({ error: "This photo isn't allowed on bart." }, { status: 422 });
+    const why: Record<string, string> = {
+      sexual: "This photo can't be shared on bart.",
+      violence: 'This photo looks violent or graphic.',
+      hate: 'This photo looks like it includes a hate symbol.',
+      banned_item: `This looks like ${verdict.what ? verdict.what.toLowerCase() : 'a banned item'}, which can't be listed on bart.`,
+    };
+    return NextResponse.json({ error: `${why[verdict.category ?? ''] ?? "This photo isn't allowed on bart."} If that's wrong, try another photo.` }, { status: 422 });
   }
 
   // Allowed: store it

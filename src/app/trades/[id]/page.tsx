@@ -28,7 +28,7 @@ function calendarLink(o: Offer, spot?: SafeSpot) {
   const f = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const p = new URLSearchParams({
     action: 'TEMPLATE', text: `bart: ${o.listing?.title ?? 'trade'}`, dates: `${f(start)}/${f(end)}`,
-    location: spot?.name ?? '', details: `Trade: ${offerGives(o)} for ${o.listing?.title ?? ''}`,
+    location: o.meet_custom ?? spot?.name ?? '', details: `Trade: ${offerGives(o)} for ${o.listing?.title ?? ''}`,
   });
   return `https://calendar.google.com/calendar/render?${p}`;
 }
@@ -187,11 +187,15 @@ export default function TradeChat() {
     ) : offer.status === 'accepted' ? (
       <button key="meetup" onClick={() => setDetails(true)} className="spread"
         style={{ width: '100%', borderWidth: 0, background: 'var(--ink)', color: '#fff', padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>
-        <span className="row" style={{ gap: 8 }}>
-          <span style={{ color: 'var(--lime)' }}><Icon name="pin" size={16} /></span>
-          {offer.meet_at ? `${fmtMeet(offer.meet_at)} · ${spot?.short_name ?? ''}` : 'Set the meetup'}
+        <span className="row" style={{ gap: 8, minWidth: 0 }}>
+          <span style={{ color: 'var(--lime)', display: 'inline-flex', flexShrink: 0 }}><Icon name="pin" size={16} /></span>
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {offer.meet_at
+              ? `${new Date(offer.meet_at).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', minute: '2-digit' })} · ${offer.meet_custom ?? spot?.short_name ?? ''}`
+              : 'Set the meetup'}
+          </span>
         </span>
-        <span style={{ color: 'var(--lime)' }}>{offer.meet_at ? 'Finish trade ›' : 'Set ›'}</span>
+        <span style={{ color: 'var(--lime)', whiteSpace: 'nowrap', flexShrink: 0 }}>{offer.meet_at ? 'Finish ›' : 'Set ›'}</span>
       </button>
     ) : offer.status === 'completed' && !myRating ? (
       <button key="rate" onClick={() => setDetails(true)} className="spread"
@@ -277,7 +281,7 @@ export default function TradeChat() {
               </span>
               <div className="grow">
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{offer.meet_at ? fmtMeet(offer.meet_at) : 'No time yet'}</div>
-                <div style={{ fontSize: 13, color: 'var(--dark-sub)' }}>{spot?.name ?? ''}</div>
+                <div style={{ fontSize: 13, color: 'var(--dark-sub)' }}>{offer.meet_custom ?? spot?.name ?? ''}</div>
               </div>
               {offer.status === 'accepted' && (
                 <Link href={`/trades/${id}/meetup`} style={{ background: '#fff', color: 'var(--ink)', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontWeight: 600 }}>

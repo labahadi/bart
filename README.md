@@ -112,6 +112,7 @@ Run each of these once in the Supabase **SQL Editor**, in order, after 0001–00
 | `0008_notifications.sql` | **Notifications**: number badges on the Campus, Trades and Me tabs, a dot on trades with something new, and an Activity list behind the bell on Home. Created by the database for offers, counters, answers, messages, meetups, finished trades, likes, comments, ISO answers, and saved items being traded or taken down. Repeats collapse into one. |
 | `0009_safety.sql` | **Keeping sexual content out.** Sexual words are blocked everywhere (chat, comments, names, notes, listings), including disguises like "s3xy" or "nuuudes". Phones can no longer upload photos directly: every photo goes through the server, which checks it with AI first (see below). Adds **Report chat** (flag in the chat header) and a **Chats** section on the Reports screen where reviewers read the conversation and delete messages. |
 | `0010_pauses.sql` | **Pausing accounts** for 1 day, 3 days, 7 days or until further notice, from any report card (reason required, shown to the person). While paused they can't post, offer, message, comment, like, share or send photos, and their listings are hidden; they see a banner and can still read chats and report. The **Paused** tab on Reports lists everyone paused, with **Lift pause**. Suggested ladder: first offense 1 day, second 3 days, third 7 days; sexual content or threats can go straight to until further notice. |
+| `0011_categories_spots_times.sql` | Adds the **Misc** category (Dorm is now shown as "Dorm supplies"); meetup spots are **Van Pelt Library, Houston Hall, Rodin lobby, Harnwell lobby, Stommons, McClelland**, or **somewhere else on campus** (typed in, then checked by AI to be a public place on or next to Penn's campus before it's saved); meetups can start from **10 AM to 8 PM**. Finishing a trade is now a 4-digit code only (no QR). |
 
 Then run `npm install` again (the QR code feature added a package).
 
@@ -131,7 +132,9 @@ ANTHROPIC_API_KEY=sk-ant-...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-- `ANTHROPIC_API_KEY`: from [console.anthropic.com](https://console.anthropic.com). The same key turns on the AI fairness check. Each photo check costs a fraction of a cent.
+- `ANTHROPIC_API_KEY`: from [platform.claude.com](https://platform.claude.com). The same key turns on the AI fairness check and the custom meetup place check. Each check costs a fraction of a cent.
+
+How the photo check decides: it blocks **sexual** content even when unsure; it blocks **violence**, **hate symbols**, and (on listings only) **banned items** like alcohol, vapes or weapons only when they're clearly there and, for banned items, the main subject of the photo. A garbled answer is retried rather than blocked. People see the specific reason, and each block is recorded in `photo_blocks` with what the check saw.
 - `SUPABASE_SERVICE_ROLE_KEY`: Supabase → Project Settings → API Keys → the **service_role** key (or **Secret key**). This key can do anything in your database, so it must only ever go in `.env.local` and Vercel, never in a file whose name starts with `NEXT_PUBLIC_`, never in GitHub, never in a text to anyone.
 
 If either key is missing, photo uploads are switched off rather than allowed through unchecked. Blocked attempts are recorded; see who has tried with:

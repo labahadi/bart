@@ -1,16 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import QRCode from 'qrcode';
 import { supabase } from '@/lib/supabase';
 import { friendlyError } from '@/lib/trade';
 
-// Finish a trade in person: one person shows a QR code + 4-digit code,
-// the other scans it with their phone camera or types the digits.
+// Finish a trade in person: one person shows a 4-digit code, the other types it in.
 export function Handoff({ offerId, otherName, onDone }: { offerId: string; otherName: string; onDone: () => void }) {
   const [mode, setMode] = useState<'choose' | 'show' | 'enter'>('choose');
   const [code, setCode] = useState<{ code: string; expires_at: string } | null>(null);
-  const [qr, setQr] = useState('');
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -21,8 +18,6 @@ export function Handoff({ offerId, otherName, onDone }: { offerId: string; other
     const { data, error } = await supabase.rpc('handoff_code', { p_offer: offerId });
     if (error || !data?.[0]) { setError(friendlyError(error ?? 'Could not make a code')); return; }
     setCode(data[0]);
-    const url = `${window.location.origin}/trades/${offerId}/done?code=${data[0].code}`;
-    setQr(await QRCode.toDataURL(url, { margin: 1, width: 440, color: { dark: '#16161A', light: '#FFFFFF' } }));
   }
 
   // Countdown, and a fresh code when this one runs out
@@ -65,11 +60,8 @@ export function Handoff({ offerId, otherName, onDone }: { offerId: string; other
   if (mode === 'show') {
     return (
       <div className="stack" style={{ gap: 10, alignItems: 'center', textAlign: 'center' }}>
-        {qr
-          // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={qr} alt="QR code to finish the trade" style={{ width: 220, height: 220, borderRadius: 12, background: '#fff', padding: 8 }} />
-          : <div style={{ width: 220, height: 220, borderRadius: 12, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="spinner" /></div>}
-        <div style={{ fontFamily: 'var(--display)', fontSize: 40, fontWeight: 700, letterSpacing: 12, color: 'var(--lime)' }}>{code?.code ?? '····'}</div>
+        <div style={{ fontSize: 13, color: 'var(--dark-sub)' }}>Show {otherName} this code</div>
+        <div style={{ fontFamily: 'var(--display)', fontSize: 56, fontWeight: 700, letterSpacing: 16, color: 'var(--lime)' }}>{code?.code ?? '····'}</div>
         <div style={{ fontSize: 12, color: 'var(--dark-sub)' }}>{left > 0 ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : ''}</div>
         {error && <div style={{ color: 'var(--pink-bright)', fontSize: 13 }}>{error}</div>}
         <button className="text-btn" style={{ color: '#fff' }} onClick={() => setMode('choose')}>Back</button>

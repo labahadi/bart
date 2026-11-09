@@ -8,11 +8,12 @@ import { Icon } from '@/components/Icon';
 import { Loading, PushHeader } from '@/components/ui';
 
 const TZ = 'America/New_York';
-// Daytime only. 6 PM is listed but off: in Philadelphia it's dark by then for much of the school year.
-const SLOTS = [
+// Meetups start between 10 AM and 8 PM
+const SLOTS: { h: number; label: string; off?: boolean }[] = [
   { h: 10, label: '10 AM' }, { h: 12, label: '12 PM' }, { h: 14, label: '2 PM' },
-  { h: 16, label: '4 PM' }, { h: 18, label: 'After dark', off: true },
+  { h: 16, label: '4 PM' }, { h: 18, label: '6 PM' }, { h: 20, label: '8 PM' },
 ];
+const CUSTOM = 'custom';
 
 // Philadelphia calendar date parts for a Date
 function nyParts(d: Date) {
@@ -40,6 +41,7 @@ export default function Meetup() {
   const [dayIdx, setDayIdx] = useState(0);
   const [hour, setHour] = useState<number | null>(null);
   const [spot, setSpot] = useState<string | null>(null);
+  const [custom, setCustom] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -54,7 +56,8 @@ export default function Meetup() {
       ]);
       const o = data as unknown as Offer;
       setOffer(o); setSpots(s);
-      setSpot(o?.meet_spot ?? o?.suggested_spot ?? s[0]?.id ?? null);
+      if (o?.meet_custom) { setSpot(CUSTOM); setCustom(o.meet_custom); }
+      else setSpot(o?.meet_spot ?? o?.suggested_spot ?? s[0]?.id ?? null);
     })();
   }, [id]);
 
@@ -63,20 +66,33 @@ export default function Meetup() {
   const day = days[dayIdx];
   const slotTime = (h: number) => nyInstant(day.y, day.m, day.d, h);
   const isPast = (h: number) => slotTime(h).getTime() < Date.now() + 30 * 60 * 1000;
-  const spotName = spots.find((s) => s.id === spot)?.short_name;
+  const spotName = spot === CUSTOM ? custom.trim() : spots.find((s) => s.id === spot)?.short_name;
   const slotLabel = SLOTS.find((s) => s.h === hour)?.label;
 
   async function save() {
     if (hour === null || !spot) return;
     setBusy(true); setError('');
-    const { error } = await supabase.rpc('set_meetup', { p_offer: id, p_spot: spot, p_at: slotTime(hour).toISOString() });
-    setBusy(false);
-    if (error) setError(friendlyError(error));
-    else {
-      // Drop a note in the chat so the other person sees the change
-      await supabase.from('messages').insert({ offer_id: id, body: `Meetup set: ${day.wd} ${day.m}/${day.d}, ${slotLabel} at ${spots.find((s) => s.id === spot)?.name}` });
-      router.replace(`/trades/${id}`);
+    const at = slotTime(hour).toISOString();
+    let placeName = spots.find((s) => s.id === spot)?.name ?? '';
+    if (spot === CUSTOM) {
+      // A typed-in place: the server checks it's a public spot on Penn's campus, then saves it
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch('/api/meetup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${sess.session?.access_token ?? ''}` },
+        body: JSON.stringify({ offerId: id, place: custom.trim(), at }),
+      }).catch(() => null);
+      const json = res ? await res.json().catch(() => ({})) : {};
+      if (!res?.ok) { setBusy(false); setError(json.error ?? "Couldn't save that place. Try again."); return; }
+      placeName = json.name;
+    } else {
+      const { error } = await supabase.rpc('set_meetup', { p_offer: id, p_spot: spot, p_at: at });
+      if (error) { setBusy(false); setError(friendlyError(error)); return; }
     }
+    setBusy(false);
+    // Drop a note in the chat so the other person sees the change
+    await supabase.from('messages').insert({ offer_id: id, body: `Meetup set: ${day.wd} ${day.m}/${day.d}, ${slotLabel} at ${placeName}` });
+    router.replace(`/trades/${id}`);
   }
 
   return (
@@ -117,24 +133,32 @@ export default function Meetup() {
         </div>
 
         <div>
-          <p className="label">Safe Spot</p>
+          <p className="label">Where</p>
           <div className="stack" style={{ gap: 10 }}>
             {spots.map((s) => (
               <button key={s.id} className={`check-row ${spot === s.id ? 'on' : ''}`} style={{ minHeight: 50 }}
                 onClick={() => setSpot(s.id)} role="radio" aria-checked={spot === s.id}>
                 <span className="radio" />
                 <span className="row-title grow">{s.name}</span>
-                <span className="meta">{s.walk_min} min</span>
               </button>
             ))}
+            <button className={`check-row ${spot === CUSTOM ? 'on' : ''}`} style={{ minHeight: 50 }}
+              onClick={() => setSpot(CUSTOM)} role="radio" aria-checked={spot === CUSTOM}>
+              <span className="radio" />
+              <span className="row-title grow">Somewhere else on campus</span>
+            </button>
+            {spot === CUSTOM && (
+              <input className="input" autoFocus placeholder="e.g. 1920 Commons, Penn Bookstore" maxLength={80}
+                value={custom} onChange={(e) => setCustom(e.target.value)} />
+            )}
           </div>
         </div>
 
         {error && <div className="alert"><Icon name="warning" size={18} />{error}</div>}
       </main>
       <div className="action-bar">
-        <button className="btn pink" disabled={hour === null || !spot || busy} onClick={save}>
-          {hour === null ? 'Pick a time' : `${day.wd} ${slotLabel} · ${spotName}`}
+        <button className="btn pink" disabled={hour === null || !spot || (spot === CUSTOM && custom.trim().length < 2) || busy} onClick={save}>
+          {busy && spot === CUSTOM ? 'Checking place…' : hour === null ? 'Pick a time' : `${day.wd} ${slotLabel}${spotName ? ` · ${spotName}` : ''}`}
         </button>
       </div>
     </>

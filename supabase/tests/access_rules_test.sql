@@ -143,11 +143,11 @@ select t.expect('Riley sees no messages', not exists (select 1 from messages));
 
 -- Meetups: daytime and Safe Spots only
 select t.as_user('00000000-0000-0000-0000-00000000000a');
-select t.expect_error('8 PM meetup refused',
-  format($$select set_meetup(%L, 'van-pelt', (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 20 hours') at time zone 'America/New_York')$$,
-    (select offer_id from ids)), 'daytime');
+select t.expect_error('9 PM meetup refused',
+  format($$select set_meetup(%L, 'van-pelt', (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 21 hours') at time zone 'America/New_York')$$,
+    (select offer_id from ids)), '8 PM');
 select t.expect_error('unlisted spot refused',
-  format($$select set_meetup(%L, 'my-dorm', now() + interval '2 days')$$, (select offer_id from ids)), 'Safe Spot');
+  format($$select set_meetup(%L, 'my-dorm', now() + interval '2 days')$$, (select offer_id from ids)), 'spot from the list');
 select set_meetup((select offer_id from ids), 'houston',
   (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 16 hours') at time zone 'America/New_York');
 select t.expect('4 PM meetup saved', (select meet_spot = 'houston' from offers where id = (select offer_id from ids)));
@@ -442,6 +442,33 @@ select t.as_user('00000000-0000-0000-0000-00000000000c');
 insert into listings (title) values ('Bike after pause');
 select t.expect('unpaused person can post again', exists (select 1 from listings where title = 'Bike after pause'));
 select t.expect('non-reviewer sees 0 pause history for others', pause_count('00000000-0000-0000-0000-00000000000a') = 0);
+
+-- Categories, spots, times, custom places
+select t.expect('misc category exists', exists (select 1 from pg_enum where enumlabel = 'misc'));
+select t.expect('six meetup spots', (select count(*) = 6 from safe_spots));
+reset role;
+insert into listings (id, owner_id, title) values ('70000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-00000000000b', 'Rug');
+insert into listings (id, owner_id, title) values ('70000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-00000000000a', 'Mirror');
+set role authenticated;
+select t.as_user('00000000-0000-0000-0000-00000000000a');
+create temp table late_offer as select create_offer('70000000-0000-0000-0000-000000000001', array['70000000-0000-0000-0000-000000000002']::uuid[], '{}', 'harnwell') as offer_id;
+select t.as_user('00000000-0000-0000-0000-00000000000b');
+select respond_offer((select offer_id from late_offer), 'accept');
+select set_meetup((select offer_id from late_offer), 'stommons',
+  (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 20 hours') at time zone 'America/New_York');
+select t.expect('8 PM meetup allowed', (select meet_spot = 'stommons' from offers where id = (select offer_id from late_offer)));
+select t.expect_error('9 PM meetup refused',
+  $$select set_meetup((select offer_id from late_offer), 'stommons', (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 21 hours') at time zone 'America/New_York')$$, '8 PM');
+select t.expect_error('students cannot set a custom place directly',
+  $$select set_meetup_custom((select offer_id from late_offer), auth.uid(), 'Wawa', now() + interval '2 days')$$, 'permission denied');
+reset role;
+select set_meetup_custom((select offer_id from late_offer), '00000000-0000-0000-0000-00000000000b', 'Wawa on Spruce St',
+  (date_trunc('day', now() at time zone 'America/New_York') + interval '2 days 14 hours') at time zone 'America/New_York');
+select t.expect('server can set a checked custom place', (select meet_custom = 'Wawa on Spruce St' and meet_spot is null from offers where id = (select offer_id from late_offer)));
+select t.expect('the other person is told, not the one who set it',
+  exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-00000000000a' and kind = 'meetup' and body like 'Jordan set the meetup%')
+  and not exists (select 1 from notifications where user_id = '00000000-0000-0000-0000-00000000000b' and kind = 'meetup' and ref = (select offer_id from late_offer)));
+set role authenticated;
 
 reset role;
 \o

@@ -15,5 +15,6 @@ $P -d bart_test -f supabase/migrations/0007_campus_feed.sql
 $P -d bart_test -f supabase/migrations/0008_notifications.sql
 $P -d bart_test -f supabase/migrations/0009_safety.sql
 $P -d bart_test -f supabase/migrations/0010_pauses.sql
+$P -d bart_test -f supabase/migrations/0011_categories_spots_times.sql
 $P -d bart_test -f supabase/tests/grants_stub.sql
 $P -d bart_test -f supabase/tests/access_rules_test.sql

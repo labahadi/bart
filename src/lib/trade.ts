@@ -1,24 +1,25 @@
 // Product rules shared across screens
 
 export type Tier = 'S' | 'M' | 'L' | 'Skill';
-export type Category = 'textbooks' | 'dorm' | 'clothes' | 'tickets' | 'skills';
+export type Category = 'textbooks' | 'dorm' | 'clothes' | 'tickets' | 'skills' | 'misc';
 
 export const CATEGORIES: { id: Category; label: string }[] = [
   { id: 'textbooks', label: 'Textbooks' },
-  { id: 'dorm', label: 'Dorm' },
+  { id: 'dorm', label: 'Dorm supplies' },
   { id: 'clothes', label: 'Clothes' },
   { id: 'tickets', label: 'Tickets' },
   { id: 'skills', label: 'Skills' },
+  { id: 'misc', label: 'Misc' },
 ];
 
 export const categoryLabel = (c: Category) => CATEGORIES.find((x) => x.id === c)?.label ?? c;
 
 export const CATEGORY_ICON = {
-  textbooks: 'book', dorm: 'lamp', clothes: 'shirt', tickets: 'ticket', skills: 'code',
+  textbooks: 'book', dorm: 'lamp', clothes: 'shirt', tickets: 'ticket', skills: 'code', misc: 'box',
 } as const;
 
 export const CATEGORY_TINT: Record<Category, string> = {
-  textbooks: 'tint-pink', dorm: 'tint-blue', clothes: 'tint-green', tickets: 'tint-blue', skills: 'tint-pink',
+  textbooks: 'tint-pink', dorm: 'tint-blue', clothes: 'tint-green', tickets: 'tint-blue', skills: 'tint-pink', misc: 'tint-green',
 };
 
 export const SWEETENERS = ['Coffee on me', 'Help moving it', 'Class notes'] as const;
@@ -50,6 +51,7 @@ export type OfferStatus = 'pending' | 'accepted' | 'declined' | 'cancelled' | 'c
 export type Offer = {
   id: string; listing_id: string; from_user: string; to_user: string; sweeteners: string[];
   suggested_spot: string | null; status: OfferStatus; meet_spot: string | null; meet_at: string | null;
+  meet_custom?: string | null;
   from_confirmed: boolean; to_confirmed: boolean; created_at: string;
   awaiting: string | null; counter_count: number; countered_by: string | null;
   listing: Pick<Listing, 'id' | 'title' | 'tier' | 'category' | 'photo_paths'> | null;
