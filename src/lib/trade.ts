@@ -22,6 +22,14 @@ export const CATEGORY_TINT: Record<Category, string> = {
   textbooks: 'tint-pink', dorm: 'tint-blue', clothes: 'tint-green', tickets: 'tint-blue', skills: 'tint-pink', misc: 'tint-green',
 };
 
+// The 4 house rules everyone agrees to at sign-up (also shown in Settings)
+export const HOUSE_RULES: [string, string][] = [
+  ['No exams, answer keys or graded work', "Tutoring is fine. Doing someone's homework isn't."],
+  ['No drugs, alcohol, weapons or adult content', 'These listings get removed and accounts suspended.'],
+  ['Meet on campus', 'Between 7:30 AM and 8 PM.'],
+  ['Show up, or cancel early', 'Two no-shows means a short break from trading.'],
+];
+
 export const SWEETENERS = ['Coffee on me', 'Help moving it', 'Class notes'] as const;
 
 // Fairness meter: S = 1, M = 2, L = 3 (Skill counts as M), each sweetener = 0.5.

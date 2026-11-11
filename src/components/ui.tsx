@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import { Badge, useNotifications } from './Notifications';
 import { photoUrl } from '@/lib/supabase';
 import { CATEGORY_ICON, CATEGORY_TINT, type Listing, type Profile, initial } from '@/lib/trade';
@@ -13,10 +13,13 @@ export function Logo({ height = 30 }: { height?: number }) {
   return <img src="/brand/bart-logo-horizontal-color.svg" alt="bart" style={{ height, width: 'auto' }} />;
 }
 
+// Home, Find, Wanted, Campus, Chats. Your profile and "Add to your closet" live on Home now.
 export function BottomNav() {
   const path = usePathname();
-  const { counts } = useNotifications();
-  const item = (href: string, icon: 'home' | 'people' | 'chat' | 'person', label: string, badge = 0) => {
+  const { counts, unread } = useNotifications();
+  // Answers to your "Looking for" posts are campus notifications of kind 'iso'; they badge Wanted instead
+  const wanted = unread.filter((n) => n.kind === 'iso').length;
+  const item = (href: string, icon: IconName, label: string, badge = 0) => {
     const on = href === '/' ? path === '/' : path.startsWith(href);
     return (
       <Link href={href} className={on ? 'on' : ''}>
@@ -28,12 +31,10 @@ export function BottomNav() {
   return (
     <nav className="nav" aria-label="Main">
       {item('/', 'home', 'Home')}
-      {item('/campus', 'people', 'Campus', counts.campus)}
-      <Link href="/post" aria-label="Post an item">
-        <span className="plus"><Icon name="plus" size={24} stroke={2.4} /></span>
-      </Link>
+      {item('/find', 'search', 'Find')}
+      {item('/wanted', 'megaphone', 'Wanted', wanted)}
+      {item('/campus', 'people', 'Campus', Math.max(0, counts.campus - wanted))}
       {item('/trades', 'chat', 'Chats', counts.trades)}
-      {item('/me', 'person', 'Me', counts.me)}
     </nav>
   );
 }
@@ -54,7 +55,14 @@ export function PushHeader({ title, back, right }: {
 }
 
 const AVATAR_TINTS = ['var(--pink-tint)', 'var(--green-tint)', 'var(--blue-tint)'];
-export function Avatar({ profile, size = 40, solid }: { profile?: Profile | null; size?: number; solid?: 'blue' | 'pink' }) {
+// A profile photo when there is one (photo = profiles.avatar_path), otherwise the first initial
+export function Avatar({ profile, size = 40, solid, photo }: {
+  profile?: Profile | null; size?: number; solid?: 'blue' | 'pink'; photo?: string | null;
+}) {
+  if (photo) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={photoUrl(photo)} alt="" className="avatar" style={{ width: size, height: size, objectFit: 'cover' }} />;
+  }
   // Stable tint per person
   const n = (profile?.id ?? '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
   const style: React.CSSProperties = solid

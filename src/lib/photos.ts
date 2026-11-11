@@ -36,6 +36,14 @@ export async function uploadPhoto(_userId: string, file: File): Promise<string> 
   return (await sendToCheck(form)).path as string;
 }
 
+// Profile photo: the server checks it, stores it and points your profile at it
+export async function uploadAvatar(file: File): Promise<string> {
+  const form = new FormData();
+  form.append('file', await shrink(file), 'photo.jpg');
+  form.append('kind', 'avatar');
+  return (await sendToCheck(form)).path as string;
+}
+
 // Chat photos: the server checks it, stores it privately, and adds it to the chat
 export async function uploadChatPhoto(offerId: string, file: File) {
   const form = new FormData();

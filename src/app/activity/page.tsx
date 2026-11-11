@@ -31,7 +31,8 @@ export default function Activity() {
 
   async function open(n: Notification) {
     if (!n.read_at) await markRead({ ref: n.ref ?? undefined, tab: n.ref ? undefined : n.tab });
-    router.push(n.link);
+    // Answers to "Looking for" posts were stored with a link to the old ISO board on Campus
+    router.push(n.kind === 'iso' ? '/wanted' : n.link);
   }
 
   return (

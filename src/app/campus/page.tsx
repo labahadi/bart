@@ -1,11 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { bannedMatch, blockedAnywhere } from '@/lib/banned';
+import { blockedAnywhere } from '@/lib/banned';
 import { screenText } from '@/lib/screen';
-import { friendlyError, type Listing, type Profile } from '@/lib/trade';
+import { friendlyError, type Profile } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Avatar, BottomNav } from '@/components/ui';
@@ -17,8 +16,6 @@ type Post = {
   like_count: number; comment_count: number; liked: boolean;
 };
 type Comment = { id: string; author_id: string; body: string; created_at: string; author: Profile | null };
-type Iso = { id: string; author_id: string; want: string; can_offer: string | null; open: boolean; created_at: string; author: Profile | null };
-type IsoResponse = { iso_id: string; responder_id: string; listing: { id: string; title: string } | null; responder: Profile | null };
 
 const ago = (iso: string) => {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -30,19 +27,20 @@ const ago = (iso: string) => {
 const asProfile = (p: Post): Profile => ({ id: p.author_id, first_name: p.author_first, last_initial: p.author_initial });
 
 export default function Campus() {
-  const [tab, setTab] = useState<'feed' | 'iso'>('feed');
-  // Opening Campus clears its badge (and keeps it clear while you're here)
-  const { counts, markRead } = useNotifications();
-  useEffect(() => { if (counts.campus) markRead({ tab: 'campus' }); }, [counts.campus, markRead]);
+  // Opening Campus clears its badge (answers to "Looking for" posts are cleared on Wanted instead)
+  const { unread, markRead } = useNotifications();
+  const feedUnread = unread.filter((n) => n.tab === 'campus' && n.kind !== 'iso');
+  useEffect(() => {
+    feedUnread.forEach((n) => markRead(n.ref ? { ref: n.ref } : { tab: 'campus' }));
+  }, [feedUnread.length]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <>
       <main className="screen">
-        <h1 className="title-tab">Campus</h1>
-        <div className="segmented">
-          <button className={tab === 'feed' ? 'on' : ''} onClick={() => setTab('feed')}>Trade feed</button>
-          <button className={tab === 'iso' ? 'on' : ''} onClick={() => setTab('iso')}>ISO board</button>
+        <div>
+          <h1 className="title-tab">Campus</h1>
+          <p className="subtitle">Trades people shared, and this week&apos;s favorite</p>
         </div>
-        {tab === 'feed' ? <Feed /> : <IsoBoard />}
+        <Feed />
       </main>
       <BottomNav />
     </>
@@ -207,126 +205,5 @@ function Comments({ postId, onCount }: { postId: string; onCount: (n: number) =>
       </div>
       {error && <p className="error-text" style={{ margin: 0 }}>{error}</p>}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// ISO board
-// ---------------------------------------------------------------------------
-function IsoBoard() {
-  const { me } = useAuth();
-  const [isos, setIsos] = useState<Iso[] | null>(null);
-  const [responses, setResponses] = useState<IsoResponse[]>([]);
-  const [closet, setCloset] = useState<Listing[]>([]);
-  const [composing, setComposing] = useState(false);
-  const [want, setWant] = useState('');
-  const [canOffer, setCanOffer] = useState('');
-  const [picking, setPicking] = useState<string | null>(null);
-  const [error, setError] = useState('');
-
-  const load = useCallback(async () => {
-    if (!me) return;
-    const [{ data: i, error }, { data: r }, { data: c }] = await Promise.all([
-      supabase.from('iso_posts').select('*, author:profiles!iso_posts_author_id_fkey(id,first_name,last_initial)').eq('open', true)
-        .order('created_at', { ascending: false }).limit(50),
-      supabase.from('iso_responses').select('iso_id,responder_id,listing:listings!iso_responses_listing_id_fkey(id,title),responder:profiles!iso_responses_responder_id_fkey(id,first_name,last_initial)'),
-      supabase.from('listings').select('*').eq('owner_id', me.id).eq('status', 'active').order('created_at', { ascending: false }),
-    ]);
-    if (error) setError(friendlyError(error));
-    setIsos((i ?? []) as unknown as Iso[]);
-    setResponses((r ?? []) as unknown as IsoResponse[]);
-    setCloset((c ?? []) as Listing[]);
-  }, [me]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const bad = bannedMatch(want) ?? bannedMatch(canOffer);
-
-  async function post() {
-    setError('');
-    const problem = await screenText(want, canOffer);
-    if (problem) { setError(problem); return; }
-    const { error } = await supabase.from('iso_posts').insert({ want: want.trim(), can_offer: canOffer.trim() || null });
-    if (error) { setError(friendlyError(error)); return; }
-    setWant(''); setCanOffer(''); setComposing(false); load();
-  }
-
-  async function respond(isoId: string, listingId: string) {
-    setError('');
-    const { error } = await supabase.from('iso_responses').insert({ iso_id: isoId, listing_id: listingId });
-    if (error && !/duplicate/i.test(error.message)) { setError(friendlyError(error)); return; }
-    setPicking(null); load();
-  }
-
-  async function close(isoId: string) {
-    await supabase.from('iso_posts').update({ open: false }).eq('id', isoId);
-    load();
-  }
-
-  if (!isos || !me) return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>;
-
-  return (
-    <>
-      {composing ? (
-        <div className="card stack" style={{ gap: 10 }}>
-          <input className="input" placeholder="What are you looking for?" maxLength={80} value={want} onChange={(e) => setWant(e.target.value)} />
-          <input className="input" placeholder="What can you offer?" maxLength={120} value={canOffer} onChange={(e) => setCanOffer(e.target.value)} />
-          {bad && <p className="error-text" style={{ margin: 0 }}>&quot;{bad.term}&quot; isn&apos;t allowed on bart.</p>}
-          <div className="row" style={{ gap: 8 }}>
-            <button className="btn small outline" style={{ border: '1px solid var(--border)' }} onClick={() => setComposing(false)}>Cancel</button>
-            <button className="btn small pink" disabled={want.trim().length < 2 || !!bad} onClick={post}>Post</button>
-          </div>
-        </div>
-      ) : (
-        <button className="btn ink small" onClick={() => setComposing(true)}>Post what you&apos;re looking for</button>
-      )}
-
-      {error && <div className="alert">{error}</div>}
-      {isos.length === 0 && <div className="empty">Nothing yet.</div>}
-
-      {isos.map((i) => {
-        const mine = i.author_id === me.id;
-        const answers = responses.filter((r) => r.iso_id === i.id);
-        const myAnswer = answers.find((r) => r.responder_id === me.id);
-        return (
-          <div key={i.id} className="card stack" style={{ gap: 8 }}>
-            <div className="spread">
-              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.4, color: 'var(--pink-link, #C8106A)' }}>IN SEARCH OF</span>
-              <span className="meta">{mine ? 'You' : i.author?.first_name} · {ago(i.created_at)}</span>
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>{i.want}</div>
-            {i.can_offer && <div className="meta" style={{ fontSize: 13 }}>Can offer: {i.can_offer}</div>}
-
-            {mine ? (
-              <>
-                {answers.map((a) => (
-                  <Link key={a.responder_id} href={a.listing ? `/item/${a.listing.id}` : '#'} className="spread"
-                    style={{ background: 'var(--green-tint)', borderRadius: 12, padding: '10px 12px', color: 'var(--ink)', fontSize: 14 }}>
-                    <span><b>{a.responder?.first_name}</b> has {a.listing?.title}</span><span>›</span>
-                  </Link>
-                ))}
-                <button className="text-btn" style={{ padding: 0, alignSelf: 'flex-start', color: 'var(--muted)', fontSize: 13 }} onClick={() => close(i.id)}>
-                  {answers.length ? 'Found it' : 'Remove'}
-                </button>
-              </>
-            ) : myAnswer ? (
-              <span className="pill lime" style={{ alignSelf: 'flex-start', padding: '8px 14px' }}>Sent ✓ {myAnswer.listing?.title}</span>
-            ) : picking === i.id ? (
-              <div className="stack" style={{ gap: 8 }}>
-                {closet.map((l) => (
-                  <button key={l.id} className="check-row" style={{ minHeight: 44 }} onClick={() => respond(i.id, l.id)}>
-                    <span className="row-title grow">{l.title}</span><span className="pill" style={{ background: 'var(--bg)' }}>{l.tier}</span>
-                  </button>
-                ))}
-                <Link href={`/post?title=${encodeURIComponent(i.want)}`} className="btn small pink">List it</Link>
-                <button className="text-btn" style={{ padding: 0, color: 'var(--muted)' }} onClick={() => setPicking(null)}>Cancel</button>
-              </div>
-            ) : (
-              <button className="btn small ink" style={{ height: 40, borderRadius: 10 }} onClick={() => setPicking(i.id)}>I have this</button>
-            )}
-          </div>
-        );
-      })}
-    </>
   );
 }

@@ -55,7 +55,10 @@ Every push to `main` redeploys automatically.
 ```
 src/app/                 one folder per screen
   login/                 sign-up: Penn email → 6-digit code → name + 4 house rules
-  page.tsx               home feed: search, category chips, listing grid
+  page.tsx               home: your profile card (opens your profile), Add to your closet, fresh listings
+  find/                  search everything up for trade, category chips
+  wanted/                "Looking for" requests: ones your closet can answer, and all requests (was the ISO board)
+  settings/              profile photo, name, Google Calendar, house rules, review reports, sign out
   post/                  new listing: photos, banned-word check, category, tier, wants
   item/[id]/             item detail, save (heart), report flag
   item/[id]/offer/       build an offer: pick from your closet, sweeteners, fairness meter, Safe Spot
@@ -63,7 +66,7 @@ src/app/                 one folder per screen
   trades/                inbox: Incoming / Sent / Done, accept / decline / cancel
   trades/[id]/           live chat, meetup card, mark complete, 5-star rating
   trades/[id]/meetup/    pick day, daytime slot and Safe Spot
-  me/                    profile, stats, my closet, saved items, sign out
+  me/                    your profile: stats, closet, saved, finished trades
 src/components/          shared pieces (nav, cards, icons, sign-in gate)
 src/lib/trade.ts         product rules: tiers, fairness meter, sweeteners
 src/lib/banned.ts        banned-word list (as-you-type check)
@@ -118,6 +121,7 @@ Run each of these once in the Supabase **SQL Editor**, in order, after 0001–00
 | `0014_earlier_start.sql` | Meetups can start as early as **7:30 AM** (latest is still 8:00 PM). |
 | `0015_confirm_and_calendar.sql` | **One person proposes a meetup, the other confirms** (or suggests another time). Changing a confirmed meetup makes it a new proposal. Adds the optional **Google Calendar link** (only busy/free times, never event details) and **Share with a friend** links: a page anyone can open showing the time, place and map, plus what bart is. The page stops working a day after the meetup. |
 | `0016_word_filter.sql` | Blocks **swearing, slurs and threats everywhere**, chat included. Reviewers can **add their own blocked words** (Review reports → Words), which work right away. First names must be one word. |
+| `0017_profile_photos.sql` | **Profile photos.** Adds an optional photo to each profile (Settings → Profile photo). Photos go through the same AI photo check as listings. Safe to run before the redesign is merged: it only adds a column. |
 
 Then run `npm install` again (the QR code feature added a package).
 
