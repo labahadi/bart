@@ -389,6 +389,28 @@ select t.as_user('00000000-0000-0000-0000-00000000000d');
 insert into post_likes (post_id) select post_id from post1;
 select t.expect('more likes takes the lead', trade_of_the_week() = (select post_id from post1));
 
+select t.expect('featured: this week''s most-liked, not marked last week',
+  (select post_id = (select post_id from post1) and not last_week and week_start = (date_trunc('week', now() at time zone 'America/New_York'))::date from featured_trade()));
+-- Move post1 (3 likes) to last week: this week's post2 (1 like) now leads this week
+reset role;
+update feed_posts set created_at = ((date_trunc('week', now() at time zone 'America/New_York') - interval '3 days 12 hours') at time zone 'America/New_York')
+ where id = (select post_id from post1);
+set role authenticated;
+select t.as_user('00000000-0000-0000-0000-00000000000a');
+select t.expect('a liked post this week beats a bigger one from last week',
+  (select post_id = (select post_id from post2) and not last_week from featured_trade()));
+-- No likes this week: last week's winner stays up, marked as last week
+select t.as_user('00000000-0000-0000-0000-00000000000c');
+delete from post_likes where post_id = (select post_id from post2);
+select t.expect('no likes this week shows last week''s winner',
+  (select post_id = (select post_id from post1) and last_week from featured_trade()));
+-- Two weeks ago doesn't count
+reset role;
+update feed_posts set created_at = created_at - interval '7 days' where id = (select post_id from post1);
+set role authenticated;
+select t.as_user('00000000-0000-0000-0000-00000000000c');
+select t.expect('nothing from two weeks ago', not exists (select 1 from featured_trade()));
+
 -- ISO board
 select t.as_user('00000000-0000-0000-0000-00000000000c');
 insert into iso_posts (id, want, can_offer) values ('40000000-0000-0000-0000-000000000001', 'Rain jacket, size S', 'guitar lessons');

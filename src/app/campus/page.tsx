@@ -17,13 +17,32 @@ type Post = {
 };
 type Comment = { id: string; author_id: string; body: string; created_at: string; author: Profile | null };
 
+// "now", "12m", "5h" today; "Mon" earlier this week; "Nov 7" before that
+const TZ = 'America/New_York';
+// The Monday (Philadelphia time) of the week a moment falls in, as "YYYY-MM-DD"
+const mondayOf = (d: Date) => {
+  const [y, mo, day] = d.toLocaleDateString('en-CA', { timeZone: TZ }).split('-').map(Number);
+  const wd = (new Date(Date.UTC(y, mo - 1, day)).getUTCDay() + 6) % 7; // Mon = 0
+  return new Date(Date.UTC(y, mo - 1, day - wd)).toISOString().slice(0, 10);
+};
 const ago = (iso: string) => {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
   if (m < 1) return 'now';
   if (m < 60) return `${m}m`;
   if (m < 1440) return `${Math.round(m / 60)}h`;
-  return `${Math.round(m / 1440)}d`;
+  if (mondayOf(new Date(iso)) === mondayOf(new Date())) return new Date(iso).toLocaleDateString('en-US', { timeZone: TZ, weekday: 'short' });
+  return new Date(iso).toLocaleDateString('en-US', { timeZone: TZ, month: 'short', day: 'numeric' });
 };
+
+// "Nov 9 – 15", or "Oct 27 – Nov 2" across months (week_start is a Monday, "YYYY-MM-DD")
+const weekRange = (start: string) => {
+  const [y, mo, d] = start.split('-').map(Number);
+  const a = new Date(Date.UTC(y, mo - 1, d)), b = new Date(Date.UTC(y, mo - 1, d + 6));
+  const f = (x: Date, withMonth: boolean) => x.toLocaleDateString('en-US', { timeZone: 'UTC', month: withMonth ? 'short' : undefined, day: 'numeric' });
+  return `${f(a, true)} – ${f(b, a.getUTCMonth() !== b.getUTCMonth())}`;
+};
+
+type Featured = { post_id: string; week_start: string; last_week: boolean };
 const asProfile = (p: Post): Profile => ({ id: p.author_id, first_name: p.author_first, last_initial: p.author_initial });
 
 export default function Campus() {
@@ -52,17 +71,17 @@ export default function Campus() {
 // ---------------------------------------------------------------------------
 function Feed() {
   const [posts, setPosts] = useState<Post[] | null>(null);
-  const [leader, setLeader] = useState<string | null>(null);
+  const [featured, setFeatured] = useState<Featured | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     const [{ data, error }, { data: top }] = await Promise.all([
       supabase.rpc('campus_feed', { p_limit: 50 }),
-      supabase.rpc('trade_of_the_week'),
+      supabase.rpc('featured_trade'),
     ]);
     if (error) setError(friendlyError(error)); else setPosts(data as Post[]);
-    setLeader((top as string | null) ?? null);
+    setFeatured((top as Featured[] | null)?.[0] ?? null);
   }, []);
 
   useEffect(() => {
@@ -81,13 +100,13 @@ function Feed() {
       ? await supabase.from('post_likes').delete().eq('post_id', p.id)
       : await supabase.from('post_likes').insert({ post_id: p.id });
     if (res.error) { setError(friendlyError(res.error)); load(); }
-    else supabase.rpc('trade_of_the_week').then(({ data }) => setLeader((data as string | null) ?? null));
+    else supabase.rpc('featured_trade').then(({ data }) => setFeatured((data as Featured[] | null)?.[0] ?? null));
   }
 
   if (error) return <div className="alert">{error}</div>;
   if (!posts) return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>;
 
-  const top = posts.find((p) => p.id === leader && p.like_count > 0);
+  const top = featured ? posts.find((p) => p.id === featured.post_id) : undefined;
 
   return (
     <>
@@ -97,7 +116,7 @@ function Feed() {
             <span className="row" style={{ gap: 6, fontSize: 12, fontWeight: 700, letterSpacing: 0.5 }}>
               <span style={{ color: 'var(--lime)' }}><Icon name="trophy" size={16} /></span> TRADE OF THE WEEK
             </span>
-            <span style={{ fontSize: 12, opacity: 0.85 }}>Ends Sun</span>
+            <span style={{ fontSize: 12, opacity: 0.85 }}>{featured!.last_week ? 'Last week · ' : ''}{weekRange(featured!.week_start)}</span>
           </div>
           <div className="row">
             <Avatar profile={asProfile(top)} size={44} />
@@ -141,7 +160,7 @@ function Feed() {
             <button onClick={() => setOpen(open === p.id ? null : p.id)} className="chip" style={{ height: 36 }}>
               Comment{p.comment_count ? ` ${p.comment_count}` : ''}
             </button>
-            {p.id === top?.id && <span className="pill pink-tint" style={{ marginLeft: 'auto' }}>Leading</span>}
+            {p.id === top?.id && <span className="pill pink-tint" style={{ marginLeft: 'auto' }}>{featured?.last_week ? 'Last week' : 'Leading'}</span>}
           </div>
           {open === p.id && <Comments postId={p.id} onCount={(n) => setPosts((ps) => ps?.map((x) => x.id === p.id ? { ...x, comment_count: n } : x) ?? null)} />}
         </div>

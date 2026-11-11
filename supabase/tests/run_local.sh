@@ -21,5 +21,7 @@ $P -d bart_test -f supabase/migrations/0013_typed_times.sql
 $P -d bart_test -f supabase/migrations/0014_earlier_start.sql
 $P -d bart_test -f supabase/migrations/0015_confirm_and_calendar.sql
 $P -d bart_test -f supabase/migrations/0016_word_filter.sql
+$P -d bart_test -f supabase/migrations/0017_profile_photos.sql
+$P -d bart_test -f supabase/migrations/0018_trade_of_the_week_dates.sql
 $P -d bart_test -f supabase/tests/grants_stub.sql
 $P -d bart_test -f supabase/tests/access_rules_test.sql
