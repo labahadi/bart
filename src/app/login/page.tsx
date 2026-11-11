@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { friendlyError } from '@/lib/trade';
+import { friendlyError, HOUSE_RULES } from '@/lib/trade';
 import { blockedAnywhere } from '@/lib/banned';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
@@ -22,12 +22,7 @@ function takeNext() {
   return '/';
 }
 
-const RULES = [
-  ['No exams, answer keys or graded work', "Tutoring is fine. Doing someone's homework isn't."],
-  ['No drugs, alcohol, weapons or adult content', 'These listings get removed and accounts suspended.'],
-  ['Meet on campus', 'Between 7:30 AM and 8 PM.'],
-  ['Show up, or cancel early', 'Two no-shows means a short break from trading.'],
-];
+const RULES = HOUSE_RULES;
 
 export default function SignUp() {
   const { session, me, refresh } = useAuth();
