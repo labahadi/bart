@@ -52,7 +52,7 @@ export default function ReportQueue() {
 
   return (
     <main className="screen no-nav">
-      <PushHeader title="Reports" back="/me" />
+      <PushHeader title="Reports" back="/settings" />
 
       <div className="segmented">
         <button className={tab === 'open' ? 'on' : ''} onClick={() => setTab('open')}>

@@ -15,6 +15,7 @@ Block a photo only for these reasons:
 - "violence": graphic violence or gore.
 - "hate": hate symbols.
 - LISTING photos only, "banned_item": the main subject is drugs or drug gear, a vape, alcohol, a weapon, a fake ID, or an exam/answer key.
+PROFILE photos are usually a selfie or a picture of the person; that is fine. For profile photos use only "sexual", "violence" and "hate".
 Everything else is allowed, including: messy rooms, a bottle or can that is not the item being traded, kitchen knives in the background, posters, clothing laid out or worn normally, fully clothed people, screenshots, blurry or dark photos. For violence, hate and banned items, block only when it is clearly there.
 Reply with JSON only: {"allowed": true | false, "category": "none" | "sexual" | "violence" | "hate" | "banned_item", "what": "<3-6 words naming what you saw, only if blocked>"}`;
 
@@ -43,7 +44,8 @@ export async function POST(req: Request) {
 
   const form = await req.formData().catch(() => null);
   const file = form?.get('file');
-  const kind = form?.get('kind') === 'chat' ? 'chat' : 'listing';
+  const rawKind = form?.get('kind');
+  const kind: 'chat' | 'avatar' | 'listing' = rawKind === 'chat' ? 'chat' : rawKind === 'avatar' ? 'avatar' : 'listing';
   const offerId = String(form?.get('offerId') ?? '');
   if (!(file instanceof Blob)) return NextResponse.json({ error: 'No photo.' }, { status: 400 });
   if (file.size > 5 * 1024 * 1024) return NextResponse.json({ error: 'That photo is too big.' }, { status: 413 });
@@ -68,7 +70,7 @@ export async function POST(req: Request) {
         model: MODEL, max_tokens: 1024, system: RULES,
         messages: [{ role: 'user', content: [
           { type: 'image', source: { type: 'base64', media_type: file.type, data: bytes.toString('base64') } },
-          { type: 'text', text: `This is a ${kind === 'chat' ? 'CHAT' : 'LISTING'} photo. Is it allowed?` },
+          { type: 'text', text: `This is a ${kind === 'chat' ? 'CHAT' : kind === 'avatar' ? 'PROFILE' : 'LISTING'} photo. Is it allowed?` },
         ] }],
       }),
     }).catch(() => null);
@@ -104,11 +106,24 @@ export async function POST(req: Request) {
 
   // Allowed: store it
   const bucket = kind === 'chat' ? 'chat-photos' : 'listing-photos';
-  const path = `${kind === 'chat' ? offerId : userId}/${newId()}.jpg`;
+  const path = kind === 'chat' ? `${offerId}/${newId()}.jpg` : kind === 'avatar' ? `${userId}/avatar-${newId()}.jpg` : `${userId}/${newId()}.jpg`;
   const up = await admin.storage.from(bucket).upload(path, bytes, { contentType: file.type, upsert: false });
   if (up.error) return NextResponse.json({ error: 'Upload failed. Try again.' }, { status: 500 });
 
   if (kind === 'listing') return NextResponse.json({ path });
+
+  // Profile photo: point the profile at the new photo, then remove the old one
+  if (kind === 'avatar') {
+    const { data: before } = await admin.from('profiles').select('avatar_path').eq('id', userId).maybeSingle();
+    const { error } = await admin.from('profiles').update({ avatar_path: path }).eq('id', userId);
+    if (error) {
+      await admin.storage.from(bucket).remove([path]);
+      return NextResponse.json({ error: 'Profile photos need one more database update (0017_profile_photos.sql).' }, { status: 500 });
+    }
+    const old = (before as { avatar_path?: string | null } | null)?.avatar_path;
+    if (old && old !== path) await admin.storage.from(bucket).remove([old]);
+    return NextResponse.json({ path });
+  }
 
   const { data: message, error } = await admin.from('messages')
     .insert({ offer_id: offerId, sender_id: userId, image_path: path })
