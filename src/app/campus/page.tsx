@@ -11,7 +11,7 @@ import { Avatar, BottomNav, ProfileLink } from '@/components/ui';
 import { useNotifications } from '@/components/Notifications';
 
 type Post = {
-  id: string; offer_id: string; author_id: string; author_first: string | null; author_initial: string | null;
+  id: string; offer_id: string; author_id: string; author_first: string | null; author_initial: string | null; author_avatar?: string | null;
   gave: string; got: string; note: string | null; created_at: string;
   like_count: number; comment_count: number; liked: boolean;
 };
@@ -43,7 +43,7 @@ const weekRange = (start: string) => {
 };
 
 type Featured = { post_id: string; week_start: string; last_week: boolean };
-const asProfile = (p: Post): Profile => ({ id: p.author_id, first_name: p.author_first, last_initial: p.author_initial });
+const asProfile = (p: Post): Profile => ({ id: p.author_id, first_name: p.author_first, last_initial: p.author_initial, avatar_path: p.author_avatar });
 
 export default function Campus() {
   // Opening Campus clears its badge (answers to "Looking for" posts are cleared on Wanted instead)
@@ -180,7 +180,7 @@ function Comments({ postId, onCount }: { postId: string; onCount: (n: number) =>
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('post_comments')
-      .select('id,author_id,body,created_at,author:profiles!post_comments_author_id_fkey(id,first_name,last_initial)')
+      .select('id,author_id,body,created_at,author:profiles!post_comments_author_id_fkey(id,first_name,last_initial,avatar_path)')
       .eq('post_id', postId).order('created_at');
     const rows = (data ?? []) as unknown as Comment[];
     setList(rows); countRef.current(rows.length);

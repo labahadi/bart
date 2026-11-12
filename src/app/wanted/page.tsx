@@ -73,9 +73,9 @@ export default function Wanted() {
   const load = useCallback(async () => {
     if (!me) return;
     const [{ data: i, error }, { data: r }, { data: c }] = await Promise.all([
-      supabase.from('iso_posts').select('*, author:profiles!iso_posts_author_id_fkey(id,first_name,last_initial)').eq('open', true)
+      supabase.from('iso_posts').select('*, author:profiles!iso_posts_author_id_fkey(id,first_name,last_initial,avatar_path)').eq('open', true)
         .order('created_at', { ascending: false }).limit(100),
-      supabase.from('iso_responses').select('iso_id,responder_id,listing:listings!iso_responses_listing_id_fkey(id,title),responder:profiles!iso_responses_responder_id_fkey(id,first_name,last_initial)'),
+      supabase.from('iso_responses').select('iso_id,responder_id,listing:listings!iso_responses_listing_id_fkey(id,title),responder:profiles!iso_responses_responder_id_fkey(id,first_name,last_initial,avatar_path)'),
       supabase.from('listings').select('*').eq('owner_id', me.id).eq('status', 'active').order('created_at', { ascending: false }),
     ]);
     if (error) setError(friendlyError(error));

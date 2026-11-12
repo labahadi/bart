@@ -242,7 +242,7 @@ export default function Settings() {
             <span style={{ fontSize: 15, fontWeight: 600 }}>Push notifications</span>
             <span className="meta">Offers, messages, meetups</span>
           </span>
-          {toggle(push === 'on', togglePush, 'Push notifications', pushBusy || push === null || push === 'not-setup')}
+          {toggle(push === 'on', togglePush, 'Push notifications', pushBusy || push === null)}
         </div>
         {(pushNote || push === 'install' || push === 'blocked') && (
           <p className="meta" style={{ margin: '0 0 12px', fontWeight: 600, color: 'var(--error)' }}>

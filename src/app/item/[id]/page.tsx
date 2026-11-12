@@ -26,7 +26,7 @@ export default function ItemDetail() {
       if (!data) { setMissing(true); return; }
       setItem(data as Listing);
       const [{ data: p }, { data: s }, { data: sv }] = await Promise.all([
-        supabase.from('profiles').select('id,first_name,last_initial').eq('id', data.owner_id).single(),
+        supabase.from('profiles').select('id,first_name,last_initial,avatar_path').eq('id', data.owner_id).single(),
         supabase.rpc('trader_stats', { p_user: data.owner_id }),
         supabase.from('saves').select('listing_id').eq('listing_id', id).maybeSingle(),
       ]);

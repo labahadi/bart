@@ -28,7 +28,7 @@ export default function BuildOffer() {
       if (!t) return;
       setTarget(t as Listing);
       const [{ data: p }, { data: mineData }] = await Promise.all([
-        supabase.from('profiles').select('id,first_name,last_initial').eq('id', t.owner_id).single(),
+        supabase.from('profiles').select('id,first_name,last_initial,avatar_path').eq('id', t.owner_id).single(),
         supabase.from('listings').select('*').eq('owner_id', me.id).eq('status', 'active').order('created_at', { ascending: false }),
       ]);
       setOwner(p as Profile);

@@ -59,6 +59,8 @@ const AVATAR_TINTS = ['var(--pink-tint)', 'var(--green-tint)', 'var(--blue-tint)
 export function Avatar({ profile, size = 40, solid, photo }: {
   profile?: Profile | null; size?: number; solid?: 'blue' | 'pink'; photo?: string | null;
 }) {
+  // Anyone's profile photo shows wherever their profile was loaded with avatar_path
+  photo = photo ?? profile?.avatar_path;
   if (photo) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={photoUrl(photo)} alt="" className="avatar" style={{ width: size, height: size, objectFit: 'cover' }} />;

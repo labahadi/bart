@@ -44,7 +44,7 @@ export function fairness(target: Tier, offered: Tier[], sweeteners: number) {
   return { total, label, color, fill: Math.min(1, total / (goal * 2)) };
 }
 
-export type Profile = { id: string; first_name: string | null; last_initial: string | null };
+export type Profile = { id: string; first_name: string | null; last_initial: string | null; avatar_path?: string | null };
 export const displayName = (p?: Profile | null) =>
   p ? `${p.first_name ?? 'Student'}${p.last_initial ? ` ${p.last_initial}.` : ''}` : 'Student';
 export const initial = (p?: Profile | null) => (p?.first_name?.[0] ?? '?').toUpperCase();
@@ -73,8 +73,8 @@ export type Offer = {
 // One query shape for offers, used by the inbox and the chat
 export const OFFER_SELECT = `*,
   listing:listings!offers_listing_id_fkey(id,title,tier,category,photo_paths),
-  from:profiles!offers_from_user_fkey(id,first_name,last_initial),
-  to:profiles!offers_to_user_fkey(id,first_name,last_initial),
+  from:profiles!offers_from_user_fkey(id,first_name,last_initial,avatar_path),
+  to:profiles!offers_to_user_fkey(id,first_name,last_initial,avatar_path),
   items:offer_items(listing:listings(id,title,tier,category,photo_paths))`;
 
 // From my side of a trade: the item I get and the first item I give
