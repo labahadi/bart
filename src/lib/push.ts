@@ -58,3 +58,14 @@ export async function disablePush() {
     await sub.unsubscribe().catch(() => {});
   }
 }
+
+// Settings → "Send a test": returns a short line saying what happened
+export async function testPush(): Promise<string> {
+  const { data: sess } = await supabase.auth.getSession();
+  const res = await fetch('/api/push/test', { method: 'POST', headers: { authorization: `Bearer ${sess.session?.access_token ?? ''}` } }).catch(() => null);
+  const j = res ? await res.json().catch(() => ({})) : {};
+  if (!res?.ok) return j.error ?? 'Couldn\u2019t reach bart.';
+  if (!j.devices) return 'No devices are turned on for you. Turn the toggle off and on again.';
+  if (j.sent) return `Sent to ${j.sent} device${j.sent === 1 ? '' : 's'}.`;
+  return `Didn\u2019t send: ${j.errors?.[0] ?? 'unknown error'}`;
+}

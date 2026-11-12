@@ -8,7 +8,8 @@ import { blockedAnywhere } from '@/lib/banned';
 import { uploadAvatar } from '@/lib/photos';
 import { classYears, friendlyError, HOUSE_RULES } from '@/lib/trade';
 import { linkCalendar, linkResult, myCalendar, unlinkCalendar } from '@/lib/calendar';
-import { disablePush, enablePush, pushState, type PushState } from '@/lib/push';
+import { disablePush, enablePush, pushState, testPush, type PushState } from '@/lib/push';
+import { clearRemember } from '@/lib/remember';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Avatar, PushHeader } from '@/components/ui';
@@ -108,6 +109,7 @@ export default function Settings() {
 
   async function signOut() {
     await supabase.auth.signOut();
+    clearRemember();
     router.replace('/login');
   }
 
@@ -244,8 +246,14 @@ export default function Settings() {
           </span>
           {toggle(push === 'on', togglePush, 'Push notifications', pushBusy || push === null)}
         </div>
+        {push === 'on' && (
+          <button className="text-btn" style={{ padding: 0, alignSelf: 'flex-start', marginBottom: 12 }} disabled={pushBusy}
+            onClick={async () => { setPushBusy(true); setPushNote(''); setPushNote(await testPush()); setPushBusy(false); }}>
+            Send a test
+          </button>
+        )}
         {(pushNote || push === 'install' || push === 'blocked') && (
-          <p className="meta" style={{ margin: '0 0 12px', fontWeight: 600, color: 'var(--error)' }}>
+          <p className="meta" style={{ margin: '0 0 12px', fontWeight: 600, color: pushNote.startsWith('Sent to') ? 'var(--ink)' : 'var(--error)' }}>
             {pushNote || (push === 'install' ? 'On iPhone, add bart to your Home Screen first: Share → Add to Home Screen.' : 'Notifications are blocked for bart in your phone or browser settings.')}
           </p>
         )}

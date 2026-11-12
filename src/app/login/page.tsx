@@ -8,6 +8,7 @@ import { blockedAnywhere } from '@/lib/banned';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Logo } from '@/components/ui';
+import { rememberSignIn } from '@/lib/remember';
 
 // Penn addresses, including school subdomains like wharton.upenn.edu
 const isPennEmail = (e: string) => /^[^@\s]+@([a-z0-9-]+\.)*upenn\.edu$/i.test(e.trim());
@@ -37,6 +38,7 @@ export default function SignUp() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
+  const [remember, setRemember] = useState(true);
   // Seconds until another code can be requested (Supabase allows one per email every 60s)
   const [cooldown, setCooldown] = useState(0);
   useEffect(() => {
@@ -86,7 +88,8 @@ export default function SignUp() {
     setBusy(true); setError('');
     const { error } = await supabase.auth.verifyOtp({ email: email.trim().toLowerCase(), token: code, type: 'email' });
     setBusy(false);
-    if (error) setError(friendlyError(error));
+    if (error) { setError(friendlyError(error)); return; }
+    rememberSignIn(remember);
     // On success, the effect above moves us to step 3 once the profile loads
   }
 
@@ -146,7 +149,9 @@ export default function SignUp() {
       {step === 2 && (
         <>
           <h1 className="display" style={{ fontSize: 30, lineHeight: 1.05, marginTop: 24 }}>Check your inbox</h1>
-          <p className="body" style={{ fontSize: 15 }}>We sent a code to <b>{email}</b></p>
+          <p className="body" style={{ fontSize: 15 }}>
+            {note ? <>Already sent to <b>{email}</b>. Use the newest email.</> : <>We sent a code to <b>{email}</b></>}
+          </p>
           <div>
             <label className="label" htmlFor="code" style={{ display: 'block' }}>Code</label>
             <input id="code" className="input" inputMode="numeric" autoComplete="one-time-code" placeholder="000000"
@@ -154,14 +159,22 @@ export default function SignUp() {
               onKeyDown={(e) => e.key === 'Enter' && code.length >= 6 && verify()}
               style={{ height: 60, fontFamily: 'var(--display)', fontSize: 28, letterSpacing: 10, textAlign: 'center' }} />
           </div>
+          <button role="checkbox" aria-checked={remember} onClick={() => setRemember(!remember)} className="row"
+            style={{ gap: 10, background: 'none', border: 'none', padding: '2px 0', alignSelf: 'flex-start', fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>
+            <span style={{ width: 22, height: 22, borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              background: remember ? 'var(--blue)' : 'var(--surface)', border: remember ? 'none' : '1.5px solid var(--border)', color: '#fff' }}>
+              {remember && <Icon name="check" size={14} stroke={3} />}
+            </span>
+            Keep me signed in
+          </button>
           <button className="btn" disabled={code.length < 6 || busy} onClick={verify}>
             {busy ? 'Checking…' : 'Verify'}
           </button>
-          <div className="row" style={{ justifyContent: 'center', gap: 4 }}>
-            <button className="text-btn" onClick={() => { setStep(1); setCode(''); setError(''); setNote(''); }}>Use a different email</button>
+          <div className="spread" style={{ gap: 8 }}>
+            <button className="text-btn" style={{ padding: 0, whiteSpace: 'nowrap' }} onClick={() => { setStep(1); setCode(''); setError(''); setNote(''); }}>Different email</button>
             <button className="text-btn" onClick={sendCode} disabled={busy || cooldown > 0}
-              style={cooldown > 0 ? { color: 'var(--muted)' } : undefined}>
-              {cooldown > 0 ? `Send a new code in ${cooldown}s` : 'Send a new code'}
+              style={{ padding: 0, whiteSpace: 'nowrap', ...(cooldown > 0 ? { color: 'var(--muted)' } : {}) }}>
+              {cooldown > 0 ? `New code in ${cooldown}s` : 'Send a new code'}
             </button>
           </div>
         </>
@@ -206,7 +219,6 @@ export default function SignUp() {
         </>
       )}
 
-      {note && !error && <div className="toast">{note}</div>}
       {error && <div className="alert"><Icon name="warning" size={18} />{error}</div>}
     </main>
   );

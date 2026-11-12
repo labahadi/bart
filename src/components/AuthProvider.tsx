@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { setExtraTerms } from '@/lib/banned';
+import { clearRemember, shouldForgetSession } from '@/lib/remember';
 import { Loading } from './ui';
 import { NotificationsProvider } from './Notifications';
 
@@ -48,6 +49,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
+      // They chose not to stay signed in and the browser was closed since: start signed out
+      if (data.session && shouldForgetSession()) {
+        await supabase.auth.signOut();
+        clearRemember();
+        data = { session: null };
+      }
       setSession(data.session);
       await loadProfile(data.session);
       setReady(true);
