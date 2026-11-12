@@ -14,6 +14,6 @@ export async function POST(req: Request) {
   const cfg = pushConfig();
   if (cfg.missing.length) return NextResponse.json({ error: `Missing in Vercel: ${cfg.missing.join(', ')}` }, { status: 500 });
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, cfg.serviceKey!, { auth: { persistSession: false } });
-  const result = await sendToUser(db, data.user.id, { title: 'bart', body: 'Test notification. You’re all set.', url: '/settings', tag: 'test' });
+  const result = await sendToUser(db, data.user.id, { title: 'Test notification', body: 'You’re all set.', url: '/settings', tag: 'test' });
   return NextResponse.json(result);
 }
