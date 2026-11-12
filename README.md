@@ -217,3 +217,24 @@ The Google account must match the bart email. If a school's email isn't a Google
 - **Word list (chat, comments, names, listings, ISO):** enforced by the database, so nothing gets around it. Reviewers add words under Review reports → Words.
 - **AI check (listings, ISO posts, comments, trade notes; not chat):** before posting, `/api/screen` asks Claude whether the text has a private person's full name or nasty language the list missed. Public figures, authors and brands are fine ("Taylor Swift tickets"). It runs in the app before saving, so if the AI is down, posts still go through with the word list.
 
+## Push notifications (optional)
+
+Phones get a notification whenever something lands in Activity (offers, messages, meetups), except during quiet hours (11 PM to 8 AM) for people who leave those on. On iPhone, people must add bart to their Home Screen first (Share → Add to Home Screen), then turn notifications on in Settings.
+
+1. Run `0020_blocking_and_push.sql` in the SQL Editor.
+2. In Terminal, in the project folder: `npx web-push generate-vapid-keys`. It prints a public and a private key.
+3. In Vercel → Settings → Environment Variables, add:
+   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` = the public key
+   - `VAPID_PRIVATE_KEY` = the private key
+   - `VAPID_SUBJECT` = `mailto:` plus your email
+   - `PUSH_WEBHOOK_SECRET` = any long random string
+   Redeploy.
+4. Supabase → Database → Webhooks → Create a new hook:
+   - Table `notifications`, events **Insert** and **Update**
+   - Type **HTTP Request**, method POST, URL `https://bart-sand.vercel.app/api/push`
+   - HTTP header `x-push-secret` = the same `PUSH_WEBHOOK_SECRET`
+
+## Blocking
+
+Blocking someone (from their profile) ends any open trade between you, stops offers, messages and Looking-for answers either way, and hides each other's listings, Campus posts, comments and Looking-for posts. They aren't told. Unblock from Settings → Blocked people.
+

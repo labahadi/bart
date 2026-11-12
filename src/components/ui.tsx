@@ -118,3 +118,13 @@ export function ListingCard({ listing, mine }: { listing: Listing; mine?: boolea
 export function Loading() {
   return <div className="center-screen"><div className="spinner" /></div>;
 }
+
+// Tap a person's name or photo to see their profile (closet, rating, trades)
+export function ProfileLink({ id, children, style }: { id?: string | null; children: React.ReactNode; style?: React.CSSProperties }) {
+  if (!id) return <>{children}</>;
+  return (
+    <Link href={`/u/${id}`} onClick={(e) => e.stopPropagation()} style={{ color: 'inherit', ...style }}>
+      {children}
+    </Link>
+  );
+}

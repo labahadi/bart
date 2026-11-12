@@ -105,3 +105,11 @@ export function friendlyError(e: unknown): string {
   if (/expired|invalid|otp/i.test(msg)) return `That code didn't work. Check it, or send a new one. (${msg})`;
   return msg.replace(/^ERROR:\s*/, '');
 }
+
+// Class year: "2028" -> "Class of 2028", "Grad" -> "Grad student"
+export const classLabel = (y?: string | null) => (!y ? '' : y === 'Grad' ? 'Grad student' : `Class of ${y}`);
+// The undergrad years to offer: this year's seniors through next fall's first-years
+export function classYears(now = new Date()) {
+  const first = now.getMonth() >= 5 ? now.getFullYear() + 1 : now.getFullYear();
+  return [first, first + 1, first + 2, first + 3].map(String);
+}

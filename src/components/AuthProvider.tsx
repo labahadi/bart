@@ -8,7 +8,7 @@ import { setExtraTerms } from '@/lib/banned';
 import { Loading } from './ui';
 import { NotificationsProvider } from './Notifications';
 
-type Me = { id: string; first_name: string | null; last_initial: string | null; rules_accepted_at: string | null; avatar_path?: string | null };
+type Me = { id: string; first_name: string | null; last_initial: string | null; rules_accepted_at: string | null; avatar_path?: string | null; class_year?: string | null };
 type AuthState = { session: Session | null; me: Me | null; ready: boolean; refresh: () => Promise<void> };
 
 const AuthContext = createContext<AuthState>({ session: null, me: null, ready: false, refresh: async () => {} });
@@ -30,9 +30,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await supabase.from('profiles')
       .select('id,first_name,last_initial,rules_accepted_at').eq('id', s.user.id).single();
     setMe(data ?? null);
-    // Profile photo, asked for separately so sign-in still works if 0017_profile_photos.sql hasn't been run yet
+    // Profile photo and class year, asked for separately so sign-in still works if their SQL hasn't been run yet
     supabase.from('profiles').select('avatar_path').eq('id', s.user.id).maybeSingle().then(({ data: p, error }) => {
       if (!error) setMe((m) => (m && m.id === s.user.id ? { ...m, avatar_path: (p as { avatar_path: string | null } | null)?.avatar_path ?? null } : m));
+    });
+    supabase.from('profiles').select('class_year').eq('id', s.user.id).maybeSingle().then(({ data: p, error }) => {
+      if (!error) setMe((m) => (m && m.id === s.user.id ? { ...m, class_year: (p as { class_year: string | null } | null)?.class_year ?? null } : m));
     });
     // Is this account paused right now?
     const { data: pauses } = await supabase.from('suspensions').select('until,lifted_at')

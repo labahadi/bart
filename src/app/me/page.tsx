@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { displayName, OFFER_SELECT, sides, type Listing, type Offer } from '@/lib/trade';
+import { classLabel, displayName, OFFER_SELECT, sides, type Listing, type Offer } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Avatar, ItemThumb, PushHeader } from '@/components/ui';
@@ -56,6 +56,7 @@ export default function Me() {
         <div className="stack" style={{ gap: 6 }}>
           <div className="display" style={{ fontSize: 24 }}>{displayName(me)}</div>
           <span className="pill blue-tint" style={{ alignSelf: 'flex-start' }}><Icon name="shield" size={14} /> Verified student</span>
+          {me.class_year && <span className="meta">{classLabel(me.class_year)}</span>}
         </div>
       </div>
 

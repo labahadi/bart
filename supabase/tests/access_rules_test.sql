@@ -411,6 +411,14 @@ set role authenticated;
 select t.as_user('00000000-0000-0000-0000-00000000000c');
 select t.expect('nothing from two weeks ago', not exists (select 1 from featured_trade()));
 
+select t.as_user('00000000-0000-0000-0000-00000000000a');
+update profiles set class_year = '2028' where id = auth.uid();
+select t.expect('class year saves', (select class_year = '2028' from profiles where id = auth.uid()));
+select t.expect_error('class year must be a year or Grad', $$update profiles set class_year = 'sophomore' where id = auth.uid()$$, 'class_year');
+update profiles set class_year = 'Grad' where id = auth.uid();
+update profiles set class_year = '2029' where id = '00000000-0000-0000-0000-00000000000b';
+select t.expect('cannot set someone else''s class year', (select class_year is null from profiles where id = '00000000-0000-0000-0000-00000000000b'));
+
 -- ISO board
 select t.as_user('00000000-0000-0000-0000-00000000000c');
 insert into iso_posts (id, want, can_offer) values ('40000000-0000-0000-0000-000000000001', 'Rain jacket, size S', 'guitar lessons');
@@ -569,6 +577,45 @@ select set_meetup((select offer_id from late_offer), 'harnwell',
 select t.expect('picking a listed spot clears the map place',
   (select meet_spot = 'harnwell' and meet_custom is null and not meet_pickup and meet_lat is null from offers where id = (select offer_id from late_offer)));
 set role authenticated;
+
+-- Blocking: Alex blocks Jordan
+select t.as_user('00000000-0000-0000-0000-00000000000a');
+insert into listings (id, title, category, tier) values ('70000000-0000-0000-0000-0000000000b1', 'Block test lamp', 'dorm', 'S');
+select t.as_user('00000000-0000-0000-0000-00000000000b');
+select t.expect('before blocking, Jordan sees Alex''s listing', exists (select 1 from listings where id = '70000000-0000-0000-0000-0000000000b1'));
+select t.as_user('00000000-0000-0000-0000-00000000000a');
+select t.expect_error('cannot block yourself', $$select block_user(auth.uid())$$, 'yourself');
+select block_user('00000000-0000-0000-0000-00000000000b');
+select t.expect('blocking ends the open trade', (select status = 'cancelled' from offers where id = (select offer_id from late_offer)));
+select t.expect('Alex sees Jordan in Blocked people', exists (select 1 from my_blocks() where user_id = '00000000-0000-0000-0000-00000000000b' and first_name = 'Jordan'));
+select t.as_user('00000000-0000-0000-0000-00000000000b');
+select t.expect('Jordan can''t see who blocked them', not exists (select 1 from blocks));
+select t.expect('Jordan no longer sees Alex''s listing', not exists (select 1 from listings where id = '70000000-0000-0000-0000-0000000000b1'));
+select t.expect('Jordan no longer sees Alex''s Campus posts', not exists (select 1 from campus_feed() where author_id = '00000000-0000-0000-0000-00000000000a'));
+select t.expect_error('Jordan cannot message Alex', format($$insert into messages (offer_id, body) values (%L, 'hey')$$, (select offer_id from late_offer)), 'message this person');
+reset role;
+select t.expect_error('even the server cannot add a message between them',
+  format($$insert into messages (offer_id, sender_id, body) values (%L, '00000000-0000-0000-0000-00000000000b', 'hey')$$, (select offer_id from late_offer)), 'message this person');
+set role authenticated;
+select t.as_user('00000000-0000-0000-0000-00000000000b');
+reset role;
+select t.expect_error('no new offers between them',
+  $$insert into offers (listing_id, from_user, to_user) values ('70000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-00000000000a')$$, 'trade with this person');
+set role authenticated;
+select t.as_user('00000000-0000-0000-0000-00000000000c');
+select t.expect('other people still see Alex''s listing', exists (select 1 from listings where id = '70000000-0000-0000-0000-0000000000b1'));
+select t.as_user('00000000-0000-0000-0000-00000000000a');
+select unblock_user('00000000-0000-0000-0000-00000000000b');
+select t.as_user('00000000-0000-0000-0000-00000000000b');
+select t.expect('after unblocking, Jordan sees the listing again', exists (select 1 from listings where id = '70000000-0000-0000-0000-0000000000b1'));
+
+-- Push subscriptions
+select save_push_subscription('https://push.example.com/abc', 'key', 'auth');
+select t.expect('a device saves for push', exists (select 1 from push_subscriptions where endpoint = 'https://push.example.com/abc'));
+select t.expect_error('only https push addresses', $$select save_push_subscription('http://x', 'k', 'a')$$, 'notifications');
+select t.as_user('00000000-0000-0000-0000-00000000000c');
+select t.expect('nobody else sees your devices', not exists (select 1 from push_subscriptions));
+select t.expect('quiet hours on by default', (select quiet_hours from profiles where id = auth.uid()));
 
 reset role;
 \o

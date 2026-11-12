@@ -7,7 +7,7 @@ import { supabase, photoUrl } from '@/lib/supabase';
 import { CATEGORY_ICON, CATEGORY_TINT, categoryLabel, displayName, friendlyError, type Listing, type Profile } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
-import { Avatar, Loading } from '@/components/ui';
+import { Avatar, Loading, ProfileLink } from '@/components/ui';
 
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>();
@@ -106,6 +106,7 @@ export default function ItemDetail() {
         <h1 className="display" style={{ fontSize: 26 }}>{item.title}</h1>
         {item.description && <p className="body">{item.description}</p>}
 
+        <ProfileLink id={mine ? null : item.owner_id} style={{ display: 'block' }}>
         <div className="card row" style={{ padding: 12 }}>
           <Avatar profile={owner} size={44} solid="blue" />
           <div className="grow">
@@ -117,7 +118,9 @@ export default function ItemDetail() {
               {stats?.trades ?? 0} trade{stats?.trades === 1 ? '' : 's'}
             </div>
           </div>
+          {!mine && <span style={{ color: 'var(--muted)', display: 'inline-flex' }}><Icon name="chevron" size={16} /></span>}
         </div>
+        </ProfileLink>
 
         {wants.length > 0 && (
           <div>

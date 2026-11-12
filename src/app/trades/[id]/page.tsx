@@ -16,7 +16,7 @@ import { directionsUrl } from '@/lib/campus';
 import { ShareTrade } from '@/components/ShareTrade';
 import { useNotifications } from '@/components/Notifications';
 import { SwapRow, statusPill } from '@/components/OfferCard';
-import { ItemThumb, Loading } from '@/components/ui';
+import { ItemThumb, Loading, ProfileLink } from '@/components/ui';
 
 type Message = { id: string; sender_id: string; body: string | null; image_path: string | null; created_at: string };
 
@@ -334,7 +334,9 @@ export default function TradeChat() {
 
             <div className="card stack">
               <div className="spread">
-                <span style={{ fontSize: 15, fontWeight: 700 }}>{displayName(other)}</span>
+                <ProfileLink id={other?.id} style={{ fontSize: 15, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  {displayName(other)} <Icon name="chevron" size={14} />
+                </ProfileLink>
                 {statusPill(offer, me.id)}
               </div>
               <SwapRow offer={offer} myId={me.id} />

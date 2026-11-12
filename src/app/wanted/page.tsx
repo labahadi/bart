@@ -8,7 +8,7 @@ import { screenText } from '@/lib/screen';
 import { friendlyError, type Listing, type Profile } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
-import { Avatar, BottomNav } from '@/components/ui';
+import { Avatar, BottomNav, ProfileLink } from '@/components/ui';
 import { useNotifications } from '@/components/Notifications';
 
 // Wanted: what people on campus are looking for (this used to be the ISO board on Campus).
@@ -167,9 +167,9 @@ export default function Wanted() {
             {matches.map(({ iso, item, answer }) => (
               <div key={iso.id} className="card big stack" style={{ gap: 10 }}>
                 <div className="row" style={{ gap: 10 }}>
-                  <Avatar profile={iso.author} size={36} />
+                  <ProfileLink id={iso.author_id}><Avatar profile={iso.author} size={36} /></ProfileLink>
                   <span className="grow" style={{ fontSize: 14, lineHeight: 1.35 }}>
-                    <b>{iso.author?.first_name ?? 'Someone'}</b> is looking for <b>{iso.want}</b>
+                    <ProfileLink id={iso.author_id}><b>{iso.author?.first_name ?? 'Someone'}</b></ProfileLink> is looking for <b>{iso.want}</b>
                   </span>
                   <span className="meta">{ago(iso.created_at)}</span>
                 </div>
@@ -227,7 +227,7 @@ export default function Wanted() {
                 <div key={i.id} className="card stack" style={{ gap: 8 }}>
                   <div className="spread">
                     <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: '#C8106A' }}>{mine ? 'YOU\'RE LOOKING FOR' : 'LOOKING FOR'}</span>
-                    <span className="meta">{mine ? 'You' : i.author?.first_name} · {ago(i.created_at)}</span>
+                    <span className="meta">{mine ? 'You' : <ProfileLink id={i.author_id} style={{ fontWeight: 600 }}>{i.author?.first_name}</ProfileLink>} · {ago(i.created_at)}</span>
                   </div>
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{i.want}</div>
                   {i.can_offer && <div className="meta" style={{ fontSize: 13 }}>Can give: {i.can_offer}</div>}

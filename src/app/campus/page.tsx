@@ -7,7 +7,7 @@ import { screenText } from '@/lib/screen';
 import { friendlyError, type Profile } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
-import { Avatar, BottomNav } from '@/components/ui';
+import { Avatar, BottomNav, ProfileLink } from '@/components/ui';
 import { useNotifications } from '@/components/Notifications';
 
 type Post = {
@@ -119,9 +119,9 @@ function Feed() {
             <span style={{ fontSize: 12, opacity: 0.85 }}>{featured!.last_week ? 'Last week · ' : ''}{weekRange(featured!.week_start)}</span>
           </div>
           <div className="row">
-            <Avatar profile={asProfile(top)} size={44} />
+            <ProfileLink id={top.author_id}><Avatar profile={asProfile(top)} size={44} /></ProfileLink>
             <div style={{ fontSize: 15, lineHeight: 1.35 }}>
-              <b>{top.author_first}</b> swapped {top.gave} for {top.got}
+              <ProfileLink id={top.author_id}><b>{top.author_first}</b></ProfileLink> swapped {top.gave} for {top.got}
             </div>
           </div>
           <div className="row" style={{ gap: 8 }}>
@@ -147,9 +147,9 @@ function Feed() {
       {posts.map((p) => (
         <div key={p.id} className="card stack" style={{ gap: 10 }}>
           <div className="row" style={{ alignItems: 'flex-start' }}>
-            <Avatar profile={asProfile(p)} size={36} />
+            <ProfileLink id={p.author_id}><Avatar profile={asProfile(p)} size={36} /></ProfileLink>
             <div className="grow" style={{ fontSize: 14, lineHeight: 1.4 }}>
-              <b>{p.author_first}{p.author_initial ? ` ${p.author_initial}.` : ''}</b> swapped {p.gave} for {p.got}
+              <ProfileLink id={p.author_id}><b>{p.author_first}{p.author_initial ? ` ${p.author_initial}.` : ''}</b></ProfileLink> swapped {p.gave} for {p.got}
               {p.note && <div style={{ color: 'var(--text-2)', marginTop: 4 }}>{p.note}</div>}
             </div>
             <span className="meta">{ago(p.created_at)}</span>
@@ -209,7 +209,7 @@ function Comments({ postId, onCount }: { postId: string; onCount: (n: number) =>
     <div className="stack" style={{ gap: 8, borderTop: '1px solid var(--border-soft)', paddingTop: 10 }}>
       {list?.map((c) => (
         <div key={c.id} className="spread" style={{ alignItems: 'flex-start', fontSize: 13 }}>
-          <span><b>{c.author?.first_name ?? 'Student'}</b> {c.body}</span>
+          <span><ProfileLink id={c.author_id}><b>{c.author?.first_name ?? 'Student'}</b></ProfileLink> {c.body}</span>
           {c.author_id === me?.id && (
             <button className="text-btn" style={{ padding: 0, fontSize: 12, color: 'var(--muted)' }} onClick={() => remove(c.id)}>Delete</button>
           )}
