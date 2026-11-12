@@ -34,6 +34,7 @@ export async function POST(req: Request) {
   const { data: person } = await db.from('profiles').select('quiet_hours').eq('id', row.user_id).maybeSingle();
   if ((person?.quiet_hours ?? true) && quietNow()) return NextResponse.json({ skipped: 'quiet hours' });
 
+  // iPhones always add a "from bart" line under the title, so the title says who it's from
   // and the body says what happened: "Jordan" / "from bart" / "Is the fridge still available?"
   const i = row.body.indexOf(': ');
   const [title, body] = i > 0 && i < 40 ? [row.body.slice(0, i), row.body.slice(i + 2)] : [row.body, ''];
