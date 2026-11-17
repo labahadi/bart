@@ -127,7 +127,7 @@ export default function ReportQueue() {
             {/* Decision */}
             {r.open_count > 0 ? (
               <div className="row" style={{ gap: 8 }}>
-                <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }}
+                <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', boxShadow: 'var(--shadow)' }}
                   disabled={busy === r.listing_id} onClick={() => resolve(r, 'keep')}>Keep</button>
                 <button className="btn small pink" disabled={busy === r.listing_id} onClick={() => resolve(r, 'remove')}>Remove</button>
               </div>
@@ -278,7 +278,7 @@ function PauseControl({ name, loadCount, pause }: {
           <input className="input" style={{ height: 44 }} placeholder="Reason (they'll see this)" maxLength={300}
             value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="row" style={{ gap: 8 }}>
-            <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }} onClick={() => setOpen(false)}>Cancel</button>
+            <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', boxShadow: 'var(--shadow)' }} onClick={() => setOpen(false)}>Cancel</button>
             <button className="btn small pink" disabled={days === undefined || reason.trim().length < 3 || busy} onClick={confirm}>Pause</button>
           </div>
         </div>

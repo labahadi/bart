@@ -66,7 +66,7 @@ export default function Me() {
           [stats?.rating ? `${stats.rating} ★` : '–', 'Rating'],
           [String(current.length), 'In closet'],
         ].map(([n, label]) => (
-          <div key={label} className="card" style={{ borderRadius: 14, textAlign: 'center', padding: 12 }}>
+          <div key={label} className="card" style={{ borderRadius: 20, textAlign: 'center', padding: 12 }}>
             <div className="display" style={{ fontSize: 22 }}>{n}</div>
             <div className="meta">{label}</div>
           </div>
@@ -74,7 +74,7 @@ export default function Me() {
       </div>
 
       {traded > 0 && (
-        <div className="row" style={{ background: 'var(--green-tint)', borderRadius: 14, padding: '12px 14px', fontSize: 14, gap: 10 }}>
+        <div className="row" style={{ background: 'var(--green-tint)', borderRadius: 18, padding: '12px 14px', fontSize: 14, gap: 10 }}>
           <Icon name="check" size={20} />
           <span><b>{traded} item{traded === 1 ? '' : 's'}</b> kept out of the trash</span>
         </div>
@@ -91,7 +91,7 @@ export default function Me() {
           {rows.length === 0 && tab === 'saved' && <div className="empty">Nothing saved yet. Tap the heart on an item to save it.</div>}
           {rows.map((l) => (
             <Link key={l.id} href={`/item/${l.id}`} className="row"
-              style={{ background: 'var(--surface)', borderRadius: 14, padding: '10px 12px', color: 'var(--ink)', border: '1px solid var(--border-soft)', gap: 12 }}>
+              style={{ background: 'var(--surface)', borderRadius: 22, padding: '10px 12px', color: 'var(--ink)', boxShadow: 'var(--shadow)', gap: 12 }}>
               <ItemThumb item={l} size={44} />
               <span className="grow">
                 <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{l.title}</span>

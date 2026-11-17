@@ -1,5 +1,6 @@
 'use client';
 
+import { useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Icon, type IconName } from './Icon';
@@ -14,22 +15,52 @@ export function Logo({ height = 30 }: { height?: number }) {
 }
 
 // Home, Find, Wanted, Campus, Chats. Your profile and "Add to your closet" live on Home now.
+// The bar lives in the app shell (AuthProvider), so it stays put between tabs and the black
+// pill slides to the tab you tap instead of the whole bar redrawing.
+const TAB_PATHS = ['/', '/find', '/wanted', '/campus', '/trades'];
+
 export function BottomNav() {
   const path = usePathname();
   const { counts, unread } = useNotifications();
+  const navRef = useRef<HTMLElement>(null);
+  const [pill, setPill] = useState<{ x: number; w: number; animate: boolean } | null>(null);
+  const show = TAB_PATHS.includes(path);
+
+  // Measure the open tab and move the pill there. The first placement doesn't animate.
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav) { setPill(null); return; }
+    const place = () => {
+      const on = nav.querySelector<HTMLElement>('a.on');
+      if (!on) return;
+      setPill((p) => ({ x: on.offsetLeft, w: on.offsetWidth, animate: p !== null }));
+    };
+    place();
+    // Re-measure when the font finishes loading or the window changes size
+    const ro = new ResizeObserver(place);
+    ro.observe(nav);
+    nav.querySelectorAll('a').forEach((a) => ro.observe(a));
+    return () => ro.disconnect();
+  }, [path, show]);
+
+  if (!show) return null;
   // Answers to your "Looking for" posts are campus notifications of kind 'iso'; they badge Wanted instead
   const wanted = unread.filter((n) => n.kind === 'iso').length;
   const item = (href: string, icon: IconName, label: string, badge = 0) => {
     const on = href === '/' ? path === '/' : path.startsWith(href);
     return (
-      <Link href={href} className={on ? 'on' : ''}>
-        <span style={{ position: 'relative', display: 'inline-flex' }}><Icon name={icon} size={22} /><Badge n={badge} /></span>
-        {label}
+      <Link href={href} className={on ? 'on' : ''} aria-label={label} aria-current={on ? 'page' : undefined}>
+        <span style={{ position: 'relative', display: 'inline-flex' }}><Icon name={icon} size={22} stroke={2} /><Badge n={badge} /></span>
+        <span className="nav-label">{label}</span>
       </Link>
     );
   };
   return (
-    <nav className="nav" aria-label="Main">
+    <nav className="nav" aria-label="Main" ref={navRef}>
+      {pill && (
+        <span className={`nav-pill${pill.animate ? ' animate' : ''}`} aria-hidden="true"
+          style={{ transform: `translateX(${pill.x}px)`, width: pill.w }} />
+      )}
       {item('/', 'home', 'Home')}
       {item('/find', 'search', 'Find')}
       {item('/wanted', 'megaphone', 'Wanted', wanted)}

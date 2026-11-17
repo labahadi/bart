@@ -2,19 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRemembered } from '@/lib/remembered';
 import { supabase } from '@/lib/supabase';
 import { displayName, type Listing } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
-import { Avatar, BottomNav, ListingCard, Logo } from '@/components/ui';
+import { Avatar, ListingCard, Logo } from '@/components/ui';
 import { Badge, useNotifications } from '@/components/Notifications';
 
 export default function Home() {
   const { me } = useAuth();
   const { counts } = useNotifications();
-  const [listings, setListings] = useState<Listing[] | null>(null);
-  const [stats, setStats] = useState<{ rating: number | null; trades: number } | null>(null);
-  const [inCloset, setInCloset] = useState<number | null>(null);
+  const [listings, setListings] = useRemembered<Listing[] | null>('home:listings', null);
+  const [stats, setStats] = useRemembered<{ rating: number | null; trades: number } | null>('home:stats', null);
+  const [inCloset, setInCloset] = useRemembered<number | null>('home:closet', null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -29,12 +30,6 @@ export default function Home() {
     supabase.from('listings').select('id', { count: 'exact', head: true }).eq('owner_id', me.id).in('status', ['active', 'in_trade'])
       .then(({ count }) => setInCloset(count ?? 0));
   }, [me]);
-
-  const summary = [
-    stats?.rating ? `${stats.rating} ★` : null,
-    stats ? `${stats.trades} trade${stats.trades === 1 ? '' : 's'}` : null,
-    inCloset !== null ? `${inCloset} in closet` : null,
-  ].filter(Boolean).join(' · ');
 
   return (
     <>
@@ -58,30 +53,33 @@ export default function Home() {
         </div>
 
         {me && (
-          <div className="card big stack" style={{ gap: 12, borderRadius: 20 }}>
-            <Link href="/me" aria-label="Open your profile" className="row" style={{ gap: 14, color: 'var(--ink)' }}>
-              <span style={{ position: 'relative', display: 'inline-flex', borderRadius: 999, boxShadow: '0 0 0 3px #fff, 0 0 0 5px var(--pink)', margin: 5 }}>
-                <Avatar profile={me} size={56} solid="pink" photo={me.avatar_path} />
+          <div className="hero">
+            <span className="dot" aria-hidden="true" style={{ right: -55, top: -75, width: 150, height: 150, background: 'var(--pink)' }} />
+            <span className="dot" aria-hidden="true" style={{ right: 64, top: 18, width: 40, height: 40, background: 'var(--lime)' }} />
+            <Link href="/me" aria-label="Open your profile" className="row" style={{ gap: 14, color: '#fff' }}>
+              <span style={{ position: 'relative', display: 'inline-flex', borderRadius: 999, boxShadow: '0 0 0 3px #fff' }}>
+                <Avatar profile={me} size={58} solid="pink" photo={me.avatar_path} />
                 <Badge n={counts.me} />
               </span>
               <span className="grow stack" style={{ gap: 2 }}>
-                <span className="display" style={{ fontSize: 20 }}>{displayName(me)}</span>
-                {summary && <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{summary}</span>}
-                <span className="meta-blue" style={{ fontSize: 13 }}>View your profile</span>
-              </span>
-              <span style={{ width: 36, height: 36, borderRadius: 999, background: 'var(--bg)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Icon name="chevron" size={18} stroke={2.4} />
+                <span className="display" style={{ fontSize: 26, letterSpacing: -0.8 }}>Hey, {me.first_name ?? 'there'}</span>
+                <span style={{ fontSize: 14, fontWeight: 500 }}>View your profile ›</span>
               </span>
             </Link>
-            <Link href="/post" className="btn pink" style={{ height: 48 }}>
-              <Icon name="plus" size={20} stroke={2.4} /> Add to your closet
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              <span className="stat"><b>{stats?.trades ?? 0}</b>trade{stats?.trades === 1 ? '' : 's'}</span>
+              <span className="stat"><b>{stats?.rating ?? '–'}</b>rating</span>
+              <span className="stat"><b>{inCloset ?? 0}</b>in closet</span>
+            </div>
+            <Link href="/post" className="btn lime" style={{ height: 54 }}>
+              <Icon name="plus" size={20} stroke={2.8} /> Add to your closet
             </Link>
           </div>
         )}
 
         <div className="spread">
           <h2 className="section-title">Fresh on campus</h2>
-          <Link href="/find" style={{ fontSize: 13, fontWeight: 600 }}>Search all</Link>
+          <Link href="/find" style={{ fontSize: 14, fontWeight: 700 }}>See all</Link>
         </div>
 
         {error && <div className="alert">{error}</div>}
@@ -93,7 +91,6 @@ export default function Home() {
           </div>
         )}
       </main>
-      <BottomNav />
     </>
   );
 }

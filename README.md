@@ -1,240 +1,97 @@
-# bart: closed-beta web app
+<p align="center">
+  <img src="public/brand/bart-logo-horizontal-color.svg" alt="bart" height="64">
+</p>
 
-A working version of bart's core trade loop for 20–30 Penn students:
-sign up with a Penn email → post an item → browse → send an offer → accept or decline → chat → set a meetup at a Safe Spot → both mark it complete → rate.
+<h3 align="center">You're broke. So is everyone else.</h3>
 
-It runs in the phone's browser and can be added to the home screen like an app (Share → Add to Home Screen). No App Store needed.
-
-**Stack:** Next.js 15 (the app) · Supabase (sign-in codes, database, photo storage, live chat) · Vercel (hosting). All three have free tiers that cover a closed beta.
+<p align="center">
+  A trading app for college students. No money, just swaps.<br>
+  <a href="https://bart-penn.vercel.app"><b>bart-penn.vercel.app</b></a> · in closed beta at Penn
+</p>
 
 ---
 
-## 1. Set up Supabase (about 20 minutes, once)
+## Why we built this
 
-1. Create a free project at [supabase.com](https://supabase.com). Pick the US East region.
-2. **SQL Editor → New query.** Paste all of `supabase/migrations/0001_core.sql` and run it. Then do the same for `supabase/migrations/0002_storage_realtime.sql`.
-3. **Authentication → Sign In / Providers → Email:**
-   - Email provider: on. "Confirm email": on.
-   - Email OTP length: **6**.
-4. **Authentication → Email Templates.** In both **Magic Link** and **Confirm signup**, replace the body so it sends the code instead of a link:
-   ```html
-   <h2>Your bart code</h2>
-   <p>Enter this code to sign in: <strong style="font-size:24px;letter-spacing:4px">{{ .Token }}</strong></p>
-   <p>It expires in 1 hour. If you didn't ask for it, ignore this email.</p>
-   ```
-   Subject: `Your bart code`.
-5. **Set up your own email sender. Do this before you invite anyone.** Supabase's built-in email is for testing only: it sends a handful of emails an hour and may only deliver to your own team's addresses. Penn's mail filters also tend to quarantine mail from shared senders.
-   - Create a free [Resend](https://resend.com) account (3,000 emails a month free).
-   - Buy a cheap domain (about $12/year) and verify it in Resend by adding the DNS records it shows you.
-   - In Supabase, go to **Authentication → Emails → SMTP Settings**, turn on custom SMTP, and enter Resend's details: host `smtp.resend.com`, port `465`, user `resend`, password = your Resend API key, sender like `codes@yourdomain.com`.
-   - **Test with five real upenn.edu addresses**, including at least one `@wharton.upenn.edu` or `@seas.upenn.edu` address. If a code lands in quarantine, check the Penn quarantine digest and release it.
-6. **Project Settings → API:** copy the Project URL and the `anon` public key for the next step.
+Every college student has a closet full of stuff they don't use: the textbook from last semester, the mini fridge you won't need next year, the blazer you wore to one interview. They also have a list of things they need and can't really afford.
 
-## 2. Run it on your laptop
+Selling is a hassle and buying is expensive. So we skipped the money. On bart you post what you have, find what you want, and swap with another student on campus. Skills count too: an hour of Python help can be worth a vintage jacket.
+
+We also wanted it to feel like a campus thing, not a marketplace. So there's a feed of finished trades, a Trade of the Week voted by likes, and a board where people post what they're looking for.
+
+## How a trade works
+
+1. **Sign up with your school email.** Only verified students get in (Penn for now).
+2. **Add things to your closet.** Snap a photo, pick a size (S, M or L) and say what you'd take for it.
+3. **Find something you want**, or check **Wanted** to see who's looking for something you already have.
+4. **Make an offer.** Pick from your closet, add a sweetener ("+ a coffee"), and an optional fairness meter tells you if it's a reasonable deal.
+5. **Chat and set a meetup** at a public spot on campus. It can go straight into your Google Calendar.
+6. **Swap in person**, confirm with a 4-digit code, and rate each other.
+7. **Share it to the Campus feed** if you're proud of the deal.
+
+## What's inside
+
+| | |
+|---|---|
+| **Closet and profile** | Your listings, saved items, finished trades and rating in one place |
+| **Find and Wanted** | Search everything up for trade, or answer "looking for" posts that match your closet |
+| **Offers and counters** | Back-and-forth counter offers, with an AI second opinion on whether a trade is fair |
+| **Live chat** | Real-time messages and photos, private to the two people in the trade |
+| **Meetups** | Pick a place on Google Maps (limited to campus), propose a time, confirm, add to Calendar |
+| **Campus feed** | Finished trades, likes, comments and Trade of the Week |
+| **Notifications** | In-app activity plus push notifications, with quiet hours |
+| **Works like an app** | A web app you can add to your home screen. No App Store needed |
+
+## Safety is part of the design
+
+Trading with strangers only works if people feel safe, so most of our time went here.
+
+- **Verified students only.** Accounts need a school email, checked by the database itself.
+- **No contact info, ever.** Emails and phone numbers are never shown. Chats are tied to a real trade.
+- **Every photo is checked** by an AI model on the server before anyone can see it. Uploads switch off rather than go through unchecked.
+- **Text filters** catch banned items, slurs and disguised spellings everywhere, plus an AI check for things a word list misses.
+- **Meetups stay public and on campus**, during daytime hours, within the next two weeks.
+- **Anonymous reports, blocking and account pauses**, with a review screen for our moderators.
+
+The browser can be tampered with, so every rule that matters is enforced in the database too, not just on the screen. Access rules are covered by automated tests that act out four students trying to see, post, offer and chat where they shouldn't.
+
+## Built with
+
+| | |
+|---|---|
+| **App** | Next.js 15, React 19, TypeScript |
+| **Backend** | Supabase: Postgres with row-level security, email sign-in codes, storage, real-time chat |
+| **AI** | Claude for photo checks, text checks and the fairness meter |
+| **Maps and calendar** | Google Places, Routes and Calendar (free/busy only, never event details) |
+| **Hosting** | Vercel, with web push notifications |
+
+```
+src/app/              one folder per screen, plus api/ for server routes
+src/components/       shared pieces: nav, cards, icons, sign-in gate
+src/lib/              trade rules, fairness meter, word filters, campus boundary
+supabase/migrations/  tables, access rules and trade logic, in order
+supabase/tests/       access-rule tests
+```
+
+## Run it yourself
 
 ```bash
 npm install
-cp .env.example .env.local      # then paste the URL and anon key into .env.local
-npm run dev                     # open http://localhost:3000
+cp .env.example .env.local   # add your Supabase URL and key
+npm run dev                  # http://localhost:3000
 ```
 
-To try it on your phone while it runs on your laptop, open `http://<your-laptop-ip>:3000` on the same Wi-Fi.
+You'll need a free Supabase project first. The full guide, including email codes, deploying to Vercel and the optional AI, Maps, Calendar and push features, is in [docs/SETUP.md](docs/SETUP.md).
 
-## 3. Put it online (Vercel)
+## Where it's at
 
-1. Push this folder to a private GitHub repo.
-2. At [vercel.com](https://vercel.com), choose **Add New → Project**, import the repo, and add the two `NEXT_PUBLIC_SUPABASE_*` variables. Then deploy.
-3. In Supabase, go to **Authentication → URL Configuration** and set the Site URL to your Vercel address.
+bart is in a closed beta with a small group of Penn students. We're watching how people actually trade, fixing what's confusing, and figuring out what it takes to bring it to other campuses.
 
-Every push to `main` redeploys automatically.
+If you're a student and want in, or you have an idea, open an issue or reach out to one of us.
 
----
+## Who we are
 
-## How it fits together
+A few Penn students who got tired of buying things we'd only need for a semester.
 
-```
-src/app/                 one folder per screen
-  login/                 sign-up: Penn email → 6-digit code → name + 4 house rules
-  page.tsx               home: your profile card (opens your profile), Add to your closet, fresh listings
-  find/                  search everything up for trade, category chips
-  wanted/                "Looking for" requests: ones your closet can answer, and all requests (was the ISO board)
-  settings/              profile photo, name, Google Calendar, house rules, review reports, sign out
-  post/                  new listing: photos, banned-word check, category, tier, wants
-  item/[id]/             item detail, save (heart), report flag
-  item/[id]/offer/       build an offer: pick from your closet, sweeteners, fairness meter, Safe Spot
-  item/[id]/report/      anonymous report
-  trades/                inbox: Incoming / Sent / Done, accept / decline / cancel
-  trades/[id]/           live chat, meetup card, mark complete, 5-star rating
-  trades/[id]/meetup/    pick day, daytime slot and Safe Spot
-  me/                    your profile: stats, closet, saved, finished trades
-src/components/          shared pieces (nav, cards, icons, sign-in gate)
-src/lib/trade.ts         product rules: tiers, fairness meter, sweeteners
-src/lib/banned.ts        banned-word list (as-you-type check)
-supabase/migrations/     database tables, access rules, trade functions
-supabase/tests/          access-rule tests
-public/brand/            logo files from the brand kit
-```
-
-### Where the rules are enforced
-
-The browser can be tampered with, so every rule that matters is also enforced in the database, not just in the screens:
-
-| Rule | Where |
-|---|---|
-| Only `upenn.edu` addresses (incl. `wharton.`, `seas.`, etc.) can create an account | trigger on sign-up |
-| Must agree to the house rules before posting | listing insert policy |
-| Banned items can't be posted | trigger on listings, plus the live check on the Post screen |
-| Nobody can see emails or phone numbers | they only exist in Supabase's private auth table |
-| Only the two people in a trade can see its offer and chat | row-level security |
-| Only the owner can accept; only the sender can cancel; items can't be in two trades at once | `respond_offer` function |
-| Meetups on campus, any time from 7:30 AM to 8 PM Philadelphia time, within the next two weeks | `meetup_time_ok` function |
-| Trade is complete only when both people confirm | `confirm_complete` function |
-| Reports are anonymous; 3 reports hide a listing for everyone | reports table + trigger |
-
-### Running the tests
-
-The access-rule tests simulate four students and run 46 checks (who can see, post, offer, accept, chat and report). They need a local Postgres, not Supabase:
-
-```bash
-PGHOST=localhost PGUSER=postgres ./supabase/tests/run_local.sh
-npm run test:banned
-```
-
----
-
-## Newer features: setup
-
-Run each of these once in the Supabase **SQL Editor**, in order, after 0001–0003:
-
-| File | Adds |
-|---|---|
-| `0004_counters_chat_photos.sql` | **Counter offers** (Decline / Counter / Accept, back and forth up to 6 times) and **photos in chat** (private: only the two people in the trade can see them) |
-| `0005_handoff_codes.sql` | **Finishing a trade in person.** One person taps *Show my code* (a QR code plus 4 digits, valid 10 minutes). The other scans it with their phone camera or types the digits. After 5 wrong tries the code locks and a new one is needed. |
-| `0006_lock_listings_in_trades.sql` | Owners can **edit their listings**, but not once an item is in a trade |
-| `0007_campus_feed.sql` | The **Campus tab**: share a finished trade to the feed, likes, comments, **Trade of the Week** (most likes since Monday, ties go to the earlier post), and the **ISO board** ("I have this" points to an item in your closet; only the person who posted sees who answered) |
-| `0008_notifications.sql` | **Notifications**: number badges on the Campus, Trades and Me tabs, a dot on trades with something new, and an Activity list behind the bell on Home. Created by the database for offers, counters, answers, messages, meetups, finished trades, likes, comments, ISO answers, and saved items being traded or taken down. Repeats collapse into one. |
-| `0009_safety.sql` | **Keeping sexual content out.** Sexual words are blocked everywhere (chat, comments, names, notes, listings), including disguises like "s3xy" or "nuuudes". Phones can no longer upload photos directly: every photo goes through the server, which checks it with AI first (see below). Adds **Report chat** (flag in the chat header) and a **Chats** section on the Reports screen where reviewers read the conversation and delete messages. |
-| `0010_pauses.sql` | **Pausing accounts** for 1 day, 3 days, 7 days or until further notice, from any report card (reason required, shown to the person). While paused they can't post, offer, message, comment, like, share or send photos, and their listings are hidden; they see a banner and can still read chats and report. The **Paused** tab on Reports lists everyone paused, with **Lift pause**. Suggested ladder: first offense 1 day, second 3 days, third 7 days; sexual content or threats can go straight to until further notice. |
-| `0011_categories_spots_times.sql` | Adds the **Misc** category (Dorm is now shown as "Dorm supplies"); meetup spots are **Van Pelt Library, Houston Hall, Rodin lobby, Harnwell lobby, Stommons, McClelland**, or **somewhere else on campus** (typed in, then checked by AI to be a public place on or next to Penn's campus before it's saved); meetups can start from **10 AM to 8 PM**. Finishing a trade is now a 4-digit code only (no QR). |
-| `0012_map_places.sql` | **Somewhere else on campus** now searches **Google Maps**. People pick a real place or address; the server looks up its exact location, refuses anything outside the campus boundary (about 30th–40th St, Market St–Baltimore Ave), and shows the walking time from Locust Walk at 37th. Addresses are fine as long as they're inside the boundary. Every meetup gets **Directions** (opens Apple Maps on iPhone, Google Maps elsewhere) and **Share with a friend**. Replaces the AI place check. |
-| `0013_typed_times.sql` | Meetup times are typed in, to the minute, instead of picked from buttons. A meetup can be set for right now, up to two weeks out. People pick the place by searching Google Maps (no preset spots). |
-| `0014_earlier_start.sql` | Meetups can start as early as **7:30 AM** (latest is still 8:00 PM). |
-| `0015_confirm_and_calendar.sql` | **One person proposes a meetup, the other confirms** (or suggests another time). Changing a confirmed meetup makes it a new proposal. Adds the optional **Google Calendar link** (only busy/free times, never event details) and **Share with a friend** links: a page anyone can open showing the time, place and map, plus what bart is. The page stops working a day after the meetup. |
-| `0016_word_filter.sql` | Blocks **swearing, slurs and threats everywhere**, chat included. Reviewers can **add their own blocked words** (Review reports → Words), which work right away. First names must be one word. |
-| `0017_profile_photos.sql` | **Profile photos.** Adds an optional photo to each profile (Settings → Profile photo). Photos go through the same AI photo check as listings. Safe to run before the redesign is merged: it only adds a column. |
-
-Then run `npm install` again (the QR code feature added a package).
-
-**AI fairness check (optional).** On the offer and counter screens, "Ask AI if this is fair" sends both sides' titles, details and first photos to Claude and shows a one-line second opinion. It never blocks an offer. To turn it on:
-1. Create an API key at [console.anthropic.com](https://console.anthropic.com) and add a few dollars of credit. Each check costs a fraction of a cent.
-2. Add it to `.env.local` (and to Vercel's Environment Variables): `ANTHROPIC_API_KEY=sk-ant-...`
-3. Restart `npm run dev`.
-
-Without a key, the button simply doesn't appear. The key stays on the server and never reaches anyone's phone.
-
-### Photo safety check (required for photos)
-
-After running `0009_safety.sql`, photos only work once the server has two keys. Add both to `.env.local` (and to Vercel's Environment Variables), then restart `npm run dev`:
-
-```
-ANTHROPIC_API_KEY=sk-ant-...
-SUPABASE_SERVICE_ROLE_KEY=...
-```
-
-- `ANTHROPIC_API_KEY`: from [platform.claude.com](https://platform.claude.com). The same key turns on the AI fairness check and the custom meetup place check. Each check costs a fraction of a cent.
-
-How the photo check decides: it blocks **sexual** content even when unsure; it blocks **violence**, **hate symbols**, and (on listings only) **banned items** like alcohol, vapes or weapons only when they're clearly there and, for banned items, the main subject of the photo. A garbled answer is retried rather than blocked. People see the specific reason, and each block is recorded in `photo_blocks` with what the check saw.
-- `SUPABASE_SERVICE_ROLE_KEY`: Supabase → Project Settings → API Keys → the **service_role** key (or **Secret key**). This key can do anything in your database, so it must only ever go in `.env.local` and Vercel, never in a file whose name starts with `NEXT_PUBLIC_`, never in GitHub, never in a text to anyone.
-
-If either key is missing, photo uploads are switched off rather than allowed through unchecked. Blocked attempts are recorded; see who has tried with:
-```sql
-select p.first_name, b.kind, b.category, b.created_at from photo_blocks b join profiles p on p.id = b.user_id order by b.created_at desc;
-```
-
-To add more blocked words (for example slurs), add rows to `banned_terms` with `everywhere = true`, and the same words to `EVERYWHERE` in `src/lib/banned.ts`.
-
-### Google Maps (required for "Somewhere else on campus")
-
-1. Go to [console.cloud.google.com](https://console.cloud.google.com), create a project named `bart`, and add a billing account (a card is required, but each feature includes 10,000 free uses a month).
-2. **APIs & Services → Library**: enable **Places API (New)** and **Routes API**.
-3. **APIs & Services → Credentials → Create credentials → API key**. Edit the key: under **API restrictions**, allow only Places API (New) and Routes API.
-4. Add it to `.env.local` and to Vercel's Environment Variables as `GOOGLE_MAPS_API_KEY=...` (no `NEXT_PUBLIC_`; it stays on the server), then restart / redeploy.
-5. Protect against surprise bills: **Billing → Budgets & alerts** (e.g. a $5 alert), and **APIs & Services → Places API (New) → Quotas** to cap requests per day.
-
-Without the key, people can't pick a meetup place, so set it up before trading. To move the campus boundary, edit the numbers in `src/lib/campus.ts` and `on_campus()` in `0012_map_places.sql`.
-
-## Running the beta
-
-**Reviewing reports.** Run `supabase/migrations/0003_report_review.sql` in the SQL Editor once. Then make each teammate a reviewer (after they've signed up in the app):
-```sql
-insert into reviewers (user_id) select id from auth.users where email = 'them@wharton.upenn.edu';
-```
-Reviewers see **Review reports** on their Me tab. Each reported listing shows its photos, description, who posted it, every reason and note, and whether that person has been reported before, with **Keep it up** and **Take it down** buttons. Reporters stay anonymous, even to reviewers.
-
-**Changing the Safe Spots.** Edit the `safe_spots` table in the Table Editor. The app picks up changes automatically.
-
-**Changing the banned list.** Update both places, or the screen and the database will disagree:
-- the `banned_terms` table (this is what actually blocks posts)
-- `src/lib/banned.ts` (this is the as-you-type warning)
-
-**Seeing how it's going.** Run these in the SQL Editor for the milestone numbers:
-```sql
-select count(*) from profiles where rules_accepted_at is not null;   -- signed up
-select count(*) from listings where status <> 'removed';             -- listings
-select status, count(*) from offers group by status;                 -- offers by outcome
-```
-
----
-
-## Decisions I made that you should check
-
-- **Name at sign-up.** The spec shows "Jordan L." on item pages but never collects a name, so step 3 asks for a first name and last initial. Names never appear on feed cards.
-- **Banned words match whole words.** The spec says "substring," but substring matching blocks "in*credible* condition" (edible) and "be*gun*". Whole words plus plurals fixes that, and "vapes" and "answer keys" are still caught.
-- **"Ask" before an offer isn't there yet.** Chat lives inside a trade, which keeps all messages tied to a real offer and easy to moderate.
-- **Skill counts as M** on the fairness meter, and the meter compares against the item you're asking for (the spec's example only covered M).
-- **No walking times on cards.** Walking times need people's locations, which the beta doesn't collect. Safe Spots still show walking times.
-- **Fridge shows a lamp icon** when there's no photo, because placeholder icons go by category (Dorm = lamp). Photos replace them.
-
-## Deliberately not built yet
-
-Perfect matches, the campus map, the challenge bar, badges, streaks, notifications and push, phone verification, blocking users, reporting a chat photo, and calendar invites (a Google Calendar link is there instead).
-
-## Google Calendar link (optional)
-
-People can link the Google Calendar for the same email they use for bart. bart only asks Google for busy/free times, never event names. Without this setup, everything else works and the link option just doesn't appear.
-
-1. Google Cloud console, same project as the Maps key → **APIs & Services → Library** → enable **Google Calendar API**.
-2. **APIs & Services → OAuth consent screen** (Google Auth Platform): app name *bart*, support email, audience **External**. Under **Data access**, add the scope `.../auth/calendar.freebusy`. Under **Audience → Test users**, add the email of everyone in the beta (up to 100) while the app is in Testing.
-3. **Credentials → Create credentials → OAuth client ID → Web application.** Authorized redirect URIs:
-   - `https://bart-sand.vercel.app/api/calendar/callback`
-   - `http://localhost:3000/api/calendar/callback`
-4. Copy the client ID and secret into Vercel (and `.env.local`) as `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`, then redeploy.
-
-The Google account must match the bart email. If a school's email isn't a Google account (or the school blocks outside apps), linking says so and nothing is saved.
-
-## Text checks
-
-- **Word list (chat, comments, names, listings, ISO):** enforced by the database, so nothing gets around it. Reviewers add words under Review reports → Words.
-- **AI check (listings, ISO posts, comments, trade notes; not chat):** before posting, `/api/screen` asks Claude whether the text has a private person's full name or nasty language the list missed. Public figures, authors and brands are fine ("Taylor Swift tickets"). It runs in the app before saving, so if the AI is down, posts still go through with the word list.
-
-## Push notifications (optional)
-
-Phones get a notification whenever something lands in Activity (offers, messages, meetups), except during quiet hours (11 PM to 8 AM) for people who leave those on. On iPhone, people must add bart to their Home Screen first (Share → Add to Home Screen), then turn notifications on in Settings.
-
-1. Run `0020_blocking_and_push.sql` in the SQL Editor.
-2. In Terminal, in the project folder: `npx web-push generate-vapid-keys`. It prints a public and a private key.
-3. In Vercel → Settings → Environment Variables, add:
-   - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` = the public key
-   - `VAPID_PRIVATE_KEY` = the private key
-   - `VAPID_SUBJECT` = `mailto:` plus your email
-   - `PUSH_WEBHOOK_SECRET` = any long random string
-   Redeploy.
-4. Supabase → Database → Webhooks → Create a new hook:
-   - Table `notifications`, events **Insert** and **Update**
-   - Type **HTTP Request**, method POST, URL `https://bart-sand.vercel.app/api/push`
-   - HTTP header `x-push-secret` = the same `PUSH_WEBHOOK_SECRET`
-
-## Blocking
-
-Blocking someone (from their profile) ends any open trade between you, stops offers, messages and Looking-for answers either way, and hides each other's listings, Campus posts, comments and Looking-for posts. They aren't told. Unblock from Settings → Blocked people.
-
+- **Naishu Vytla**, Penn Engineering
+- **Elana Hadi**, Wharton

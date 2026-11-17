@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRemembered } from '@/lib/remembered';
 import { supabase } from '@/lib/supabase';
 import { OFFER_SELECT, displayName, friendlyError, initial, offerGives, sides, turnOf, type Offer } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
-import { BottomNav, ItemThumb } from '@/components/ui';
+import { ItemThumb } from '@/components/ui';
 import { useNotifications } from '@/components/Notifications';
 
 type Last = { offer_id: string; sender_id: string; body: string | null; image_path: string | null; created_at: string };
@@ -24,8 +25,8 @@ const when = (iso: string) => {
 export default function Chats() {
   const { me } = useAuth();
   const { unreadRefs } = useNotifications();
-  const [offers, setOffers] = useState<Offer[] | null>(null);
-  const [last, setLast] = useState<Record<string, Last>>({});
+  const [offers, setOffers] = useRemembered<Offer[] | null>('trades:offers', null);
+  const [last, setLast] = useRemembered<Record<string, Last>>('trades:last', {});
   const [showPast, setShowPast] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -137,7 +138,7 @@ export default function Chats() {
               <div key={o.id} className="card" style={{ padding: '6px 12px 12px' }}>
                 <Row o={o} />
                 <div className="row" style={{ gap: 8 }}>
-                  <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }}
+                  <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', boxShadow: 'var(--shadow)' }}
                     disabled={busyId === o.id} onClick={() => respond(o.id, 'decline')}>Decline</button>
                   <Link href={`/trades/${o.id}/counter`} className="btn small" style={{ background: 'var(--surface)', color: 'var(--blue)', border: '1.5px solid var(--blue)' }}>Counter</Link>
                   <button className="btn small" disabled={busyId === o.id} onClick={() => respond(o.id, 'accept')}>Accept</button>
@@ -163,7 +164,6 @@ export default function Chats() {
           </div>
         )}
       </main>
-      <BottomNav />
     </>
   );
 }

@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRemembered } from '@/lib/remembered';
 import { supabase } from '@/lib/supabase';
 import { blockedAnywhere } from '@/lib/banned';
 import { screenText } from '@/lib/screen';
 import { friendlyError, type Profile } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
-import { Avatar, BottomNav, ProfileLink } from '@/components/ui';
+import { Avatar, ProfileLink } from '@/components/ui';
 import { useNotifications } from '@/components/Notifications';
 
 type Post = {
@@ -61,7 +62,6 @@ export default function Campus() {
         </div>
         <Feed />
       </main>
-      <BottomNav />
     </>
   );
 }
@@ -70,8 +70,8 @@ export default function Campus() {
 // Trade feed
 // ---------------------------------------------------------------------------
 function Feed() {
-  const [posts, setPosts] = useState<Post[] | null>(null);
-  const [featured, setFeatured] = useState<Featured | null>(null);
+  const [posts, setPosts] = useRemembered<Post[] | null>('campus:posts', null);
+  const [featured, setFeatured] = useRemembered<Featured | null>('campus:featured', null);
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState('');
 
