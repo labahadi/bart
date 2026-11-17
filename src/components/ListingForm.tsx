@@ -12,6 +12,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 
 const CONDITIONS = ['New', 'Like new', 'Good condition', 'Well loved'];
+const TIER_OPTIONS: [Tier, string][] = [['S', 'a coffee-ish'], ['M', 'a textbook-ish'], ['L', 'a fridge-ish']];
 
 // The listing form, used to post a new item and to edit one you already posted.
 export function ListingForm({ editId }: { editId?: string }) {
@@ -122,49 +123,54 @@ export function ListingForm({ editId }: { editId?: string }) {
     );
   }
 
+  const isSkill = category === 'skills';
   return (
     <>
       <main className="screen no-nav">
         <div className="spread">
           <button className="icon-btn" aria-label="Close" onClick={() => router.push(editId ? `/item/${editId}` : '/')}><Icon name="close" size={20} /></button>
-          <h1 className="display" style={{ fontSize: 20 }}>{editId ? 'Edit listing' : 'New listing'}</h1>
+          <h1 className="display" style={{ fontSize: 20 }}>{editId ? 'Edit listing' : 'Add to your closet'}</h1>
           <span style={{ width: 44 }} />
+        </div>
+
+        <div className="segmented">
+          <button className={!isSkill ? 'on' : ''} onClick={() => isSkill && setCategory('dorm')}>An item</button>
+          <button className={isSkill ? 'on' : ''} onClick={() => setCategory('skills')}>A skill</button>
         </div>
 
         {/* Photos */}
         <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={(e) => addPhotos(e.target.files)} />
         {photos.length === 0 ? (
-          <button onClick={() => fileInput.current?.click()} disabled={uploading}
-            style={{ height: 112, background: 'var(--surface)', border: '2px dashed var(--dashed)', borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'var(--text-2)', fontSize: 14, fontWeight: 600 }}>
-            {uploading ? <div className="spinner" /> : <Icon name="camera" />}
-            {uploading ? 'Uploading…' : 'Add up to 4 photos'}
+          <button className="photo-cta" onClick={() => fileInput.current?.click()} disabled={uploading}>
+            <span className="photo-cta-icon">{uploading ? <div className="spinner" /> : <Icon name="camera" size={28} />}</span>
+            {uploading ? 'Uploading…' : 'Add photos'}
+            <span style={{ fontSize: 13, fontWeight: 500, opacity: 0.85 }}>Up to 4</span>
           </button>
         ) : (
-          <div className="row" style={{ gap: 8 }}>
+          <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
             {photos.map((p) => (
-              <div key={p} style={{ position: 'relative', width: 76, height: 76 }}>
+              <div key={p} style={{ position: 'relative', width: 84, height: 84 }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photoUrl(p)} alt="" style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: 12 }} />
+                <img src={photoUrl(p)} alt="" style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 20 }} />
                 <button aria-label="Remove photo" onClick={() => setPhotos(photos.filter((x) => x !== p))}
-                  style={{ position: 'absolute', top: -6, right: -6, width: 24, height: 24, borderRadius: 999, border: 'none', background: 'var(--ink)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
-                  <Icon name="close" size={14} stroke={2.6} />
+                  style={{ position: 'absolute', top: -6, right: -6, width: 26, height: 26, borderRadius: 999, border: '2px solid #fff', background: 'var(--navy)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                  <Icon name="close" size={13} stroke={2.6} />
                 </button>
               </div>
             ))}
             {photos.length < 4 && (
               <button onClick={() => fileInput.current?.click()} disabled={uploading} aria-label="Add photo"
-                style={{ width: 76, height: 76, borderRadius: 12, border: '2px dashed var(--dashed)', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>
+                style={{ width: 84, height: 84, borderRadius: 20, border: '2px dashed var(--dashed)', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>
                 {uploading ? <div className="spinner" /> : <Icon name="plus" />}
               </button>
             )}
           </div>
         )}
 
-        <div>
-          <label className="label" htmlFor="title" style={{ display: 'block' }}>What are you trading?</label>
-          <input id="title" className={`input ${banned && bannedMatch(title) ? 'invalid' : ''}`} maxLength={80}
-            placeholder="Mini fridge" value={title} onChange={(e) => setTitle(e.target.value)} />
-        </div>
+        <label className={`field${banned && bannedMatch(title) ? ' invalid' : ''}`}>
+          <span>{isSkill ? 'What can you teach or do?' : 'What is it?'}</span>
+          <input maxLength={80} placeholder={isSkill ? '1 hr of Python help' : 'Mini fridge'} value={title} onChange={(e) => setTitle(e.target.value)} />
+        </label>
         {banned && (
           <div className="alert">
             <Icon name="warning" size={18} />
@@ -172,30 +178,28 @@ export function ListingForm({ editId }: { editId?: string }) {
           </div>
         )}
 
-        <div>
-          <p className="label">Category</p>
-          <div className="chips wrap">
-            {CATEGORIES.map((c) => (
-              <button key={c.id} className={`chip ${category === c.id ? 'on' : ''}`} style={{ height: 38 }} onClick={() => setCategory(c.id)}>
-                {c.label}
-              </button>
-            ))}
-          </div>
-          {category === 'skills' && (
-            <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--pink-text)', margin: '8px 0 0' }}>
-              Tutoring is fine. Graded work isn&apos;t.
-            </p>
-          )}
-        </div>
-
-        {category !== 'skills' && (
+        {isSkill ? (
+          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--pink-text)', margin: 0 }}>
+            Tutoring is fine. Graded work isn&apos;t.
+          </p>
+        ) : (
           <>
             <div>
+              <p className="label">Category</p>
+              <div className="chips wrap">
+                {CATEGORIES.filter((c) => c.id !== 'skills').map((c) => (
+                  <button key={c.id} className={`chip ${category === c.id ? 'on' : ''}`} onClick={() => setCategory(c.id)}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
               <p className="label">Trade value</p>
-              <div className="segmented">
-                {(['S', 'M', 'L'] as Tier[]).map((t) => (
-                  <button key={t} className={tier === t ? 'on' : ''} onClick={() => setTier(t)}>
-                    {t} · {t === 'S' ? 'small' : t === 'M' ? 'medium' : 'large'}
+              <div className="tier-pick">
+                {TIER_OPTIONS.map(([t, hint]) => (
+                  <button key={t} className={tier === t ? 'on' : ''} onClick={() => setTier(t)} aria-pressed={tier === t}>
+                    <b>{t}</b><span>{hint}</span>
                   </button>
                 ))}
               </div>
@@ -211,23 +215,28 @@ export function ListingForm({ editId }: { editId?: string }) {
           </>
         )}
 
-        <div>
-          <label className="label" htmlFor="desc" style={{ display: 'block' }}>Details</label>
-          <textarea id="desc" className="input" rows={3} maxLength={600} placeholder="Optional"
-            value={description} onChange={(e) => setDescription(e.target.value)} />
-        </div>
+        <label className="field">
+          <span>Would trade for</span>
+          <input maxLength={120} placeholder="Desk lamp, snacks, a coffee..." value={wants} onChange={(e) => setWants(e.target.value)} />
+        </label>
 
-        <div>
-          <label className="label" htmlFor="wants" style={{ display: 'block' }}>What do you want for it?</label>
-          <input id="wants" className="input" maxLength={120} placeholder="Desk lamp, snacks, a coffee..."
-            value={wants} onChange={(e) => setWants(e.target.value)} />
-        </div>
+        <label className="field">
+          <span>Details (optional)</span>
+          <textarea rows={3} maxLength={600} placeholder="Size, how old it is, anything worth knowing"
+            value={description} onChange={(e) => setDescription(e.target.value)} />
+        </label>
+
+        <p className="row" style={{ gap: 8, fontSize: 13, color: 'var(--text-2)', margin: 0 }}>
+          <span style={{ color: 'var(--blue)', display: 'inline-flex' }}><Icon name="shield" size={18} /></span>
+          Photos and text are checked against the house rules
+        </p>
 
         {error && <div className="alert"><Icon name="warning" size={18} />{error}</div>}
       </main>
       <div className="action-bar">
-        <button className={`btn ${editId ? '' : 'pink'}`} disabled={!canPost} onClick={submit}>
-          {banned ? 'Not allowed' : busy ? 'Saving…' : editId ? 'Save' : 'Post'}
+        <button className="btn ink" disabled={!canPost} onClick={submit}>
+          {!banned && !busy && !editId && <Icon name="plus" size={20} stroke={2.6} />}
+          {banned ? 'Not allowed' : busy ? 'Saving…' : editId ? 'Save' : 'Add to closet'}
         </button>
       </div>
     </>

@@ -197,7 +197,7 @@ export default function Settings() {
                 const on = me.class_year === y;
                 return (
                   <button key={y} className="chip" disabled={yearBusy} onClick={() => saveYear(y)} aria-pressed={on}
-                    style={on ? { background: 'var(--ink)', color: '#fff', borderColor: 'var(--ink)' } : undefined}>
+                    style={on ? { background: 'var(--navy)', color: '#fff', borderColor: 'var(--navy)' } : undefined}>
                     {y === 'Grad' ? 'Grad' : `\u2019${y.slice(2)}`}
                   </button>
                 );

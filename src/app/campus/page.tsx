@@ -44,6 +44,8 @@ const weekRange = (start: string) => {
 };
 
 type Featured = { post_id: string; week_start: string; last_week: boolean };
+// Each card alternates its two item colors
+const SIDE_TINTS = [['tint-blue', 'tint-pink'], ['tint-green', 'tint-blue']] as const;
 const asProfile = (p: Post): Profile => ({ id: p.author_id, first_name: p.author_first, last_initial: p.author_initial, avatar_path: p.author_avatar });
 
 export default function Campus() {
@@ -58,7 +60,7 @@ export default function Campus() {
       <main className="screen">
         <div>
           <h1 className="title-tab">Campus</h1>
-          <p className="subtitle">Trades people shared, and this week&apos;s favorite</p>
+          <p className="subtitle">What&apos;s happening on campus</p>
         </div>
         <Feed />
       </main>
@@ -111,56 +113,69 @@ function Feed() {
   return (
     <>
       {top && (
-        <div style={{ background: 'var(--pink)', color: '#fff', borderRadius: 18, padding: '14px 16px' }} className="stack">
+        <div className="totw">
+          <span className="totw-dot" aria-hidden="true" />
           <div className="spread">
-            <span className="row" style={{ gap: 6, fontSize: 12, fontWeight: 700, letterSpacing: 0.5 }}>
-              <span style={{ color: 'var(--lime)' }}><Icon name="trophy" size={16} /></span> TRADE OF THE WEEK
+            <span className="row" style={{ gap: 6, fontSize: 13, fontWeight: 800, letterSpacing: 0.4 }}>
+              <Icon name="trophy" size={17} /> TRADE OF THE WEEK
             </span>
-            <span style={{ fontSize: 12, opacity: 0.85 }}>{featured!.last_week ? 'Last week · ' : ''}{weekRange(featured!.week_start)}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.9, paddingRight: 36 }}>{featured!.last_week ? 'Last week' : weekRange(featured!.week_start)}</span>
           </div>
-          <div className="row">
-            <ProfileLink id={top.author_id}><Avatar profile={asProfile(top)} size={44} /></ProfileLink>
-            <div style={{ fontSize: 15, lineHeight: 1.35 }}>
-              <ProfileLink id={top.author_id}><b>{top.author_first}</b></ProfileLink> swapped {top.gave} for {top.got}
-            </div>
+          <div className="totw-title">
+            <b>{top.gave}</b> for <b>{top.got}</b>
           </div>
-          <div className="row" style={{ gap: 8 }}>
-            <button onClick={() => toggleLike(top)} aria-pressed={top.liked} className="chip"
-              style={{ height: 36, background: top.liked ? '#fff' : 'transparent', color: top.liked ? 'var(--pink)' : '#fff', borderColor: 'rgba(255,255,255,0.6)' }}>
-              ♥ {top.like_count}
-            </button>
-            <button onClick={() => setOpen(open === `top-${top.id}` ? null : `top-${top.id}`)} className="chip"
-              style={{ height: 36, background: 'transparent', color: '#fff', borderColor: 'rgba(255,255,255,0.6)' }}>
-              Comment{top.comment_count ? ` ${top.comment_count}` : ''}
-            </button>
+          <div className="spread">
+            <ProfileLink id={top.author_id} style={{ color: '#fff' }}>
+              <span className="row" style={{ gap: 8 }}>
+                <span style={{ display: 'inline-flex', borderRadius: 999, boxShadow: '0 0 0 2px #fff' }}><Avatar profile={asProfile(top)} size={32} /></span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>
+                  {top.author_first}{top.author_initial ? ` ${top.author_initial}.` : ''}
+                </span>
+              </span>
+            </ProfileLink>
+            <span className="row" style={{ gap: 6 }}>
+              <button onClick={() => setOpen(open === `top-${top.id}` ? null : `top-${top.id}`)} className="totw-btn ghost" aria-label="Comments">
+                <Icon name="chat" size={15} />{top.comment_count ? ` ${top.comment_count}` : ''}
+              </button>
+              <button onClick={() => toggleLike(top)} aria-pressed={top.liked} className="totw-btn">
+                <Icon name="heart" size={15} fill={top.liked ? 'currentColor' : 'none'} /> {top.like_count}
+              </button>
+            </span>
           </div>
           {open === `top-${top.id}` && (
-            <div style={{ background: '#fff', color: 'var(--ink)', borderRadius: 14, padding: '2px 12px 12px' }}>
+            <div style={{ background: '#fff', color: 'var(--ink)', borderRadius: 18, padding: '2px 12px 12px', position: 'relative' }}>
               <Comments postId={top.id} onCount={(n) => setPosts((ps) => ps?.map((x) => x.id === top.id ? { ...x, comment_count: n } : x) ?? null)} />
             </div>
           )}
         </div>
       )}
 
+      {posts.length > 0 && <h2 className="section-title">Recent trades</h2>}
       {posts.length === 0 && <div className="empty">No trades shared yet.</div>}
 
-      {posts.map((p) => (
-        <div key={p.id} className="card stack" style={{ gap: 10 }}>
-          <div className="row" style={{ alignItems: 'flex-start' }}>
+      {posts.map((p, i) => (
+        <div key={p.id} className="card stack" style={{ gap: 12 }}>
+          <div className="row" style={{ gap: 10 }}>
             <ProfileLink id={p.author_id}><Avatar profile={asProfile(p)} size={36} /></ProfileLink>
-            <div className="grow" style={{ fontSize: 14, lineHeight: 1.4 }}>
-              <ProfileLink id={p.author_id}><b>{p.author_first}{p.author_initial ? ` ${p.author_initial}.` : ''}</b></ProfileLink> swapped {p.gave} for {p.got}
-              {p.note && <div style={{ color: 'var(--text-2)', marginTop: 4 }}>{p.note}</div>}
+            <div className="grow" style={{ fontSize: 14 }}>
+              <ProfileLink id={p.author_id}><b>{p.author_first}{p.author_initial ? ` ${p.author_initial}.` : ''}</b></ProfileLink> traded
             </div>
+            {p.id === top?.id && <span className="pill pink-tint">{featured?.last_week ? 'Last week' : 'Leading'}</span>}
             <span className="meta">{ago(p.created_at)}</span>
           </div>
-          <div className="row" style={{ gap: 8 }}>
-            <button onClick={() => toggleLike(p)} aria-pressed={p.liked}
-              className={`chip ${p.liked ? 'pink-on' : ''}`} style={{ height: 36 }}>♥ {p.like_count}</button>
-            <button onClick={() => setOpen(open === p.id ? null : p.id)} className="chip" style={{ height: 36 }}>
-              Comment{p.comment_count ? ` ${p.comment_count}` : ''}
+          <div className="swap-pair">
+            <span className={`swap-side ${SIDE_TINTS[i % 2][0]}`}>{p.gave}</span>
+            <span style={{ color: 'var(--pink)', display: 'inline-flex', flexShrink: 0 }}><Icon name="swap" size={20} stroke={2.2} /></span>
+            <span className={`swap-side ${SIDE_TINTS[i % 2][1]}`}>{p.got}</span>
+          </div>
+          {p.note && <div style={{ fontSize: 14, color: 'var(--text-2)' }}>{p.note}</div>}
+          <div className="row" style={{ gap: 16 }}>
+            <button onClick={() => toggleLike(p)} aria-pressed={p.liked} className={`feed-action${p.liked ? ' liked' : ''}`}>
+              <Icon name="heart" size={17} fill={p.liked ? 'currentColor' : 'none'} /> {p.like_count}
             </button>
-            {p.id === top?.id && <span className="pill pink-tint" style={{ marginLeft: 'auto' }}>{featured?.last_week ? 'Last week' : 'Leading'}</span>}
+            <button onClick={() => setOpen(open === p.id ? null : p.id)} className="feed-action">
+              Comment{p.comment_count ? ` · ${p.comment_count}` : ''}
+            </button>
           </div>
           {open === p.id && <Comments postId={p.id} onCount={(n) => setPosts((ps) => ps?.map((x) => x.id === p.id ? { ...x, comment_count: n } : x) ?? null)} />}
         </div>

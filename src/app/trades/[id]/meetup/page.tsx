@@ -129,7 +129,7 @@ export default function Meetup() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
             {days.map((d, i) => (
               <button key={i} onClick={() => setDayIdx(i)}
-                style={{ height: 64, borderRadius: 12, border: dayIdx === i ? 'none' : '1px solid var(--border)', background: dayIdx === i ? 'var(--ink)' : 'var(--surface)', color: dayIdx === i ? '#fff' : 'var(--ink)', padding: 0 }}>
+                style={{ height: 64, borderRadius: 12, border: dayIdx === i ? 'none' : '1px solid var(--border)', background: dayIdx === i ? 'var(--navy)' : 'var(--surface)', color: dayIdx === i ? '#fff' : 'var(--ink)', padding: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>{d.wd}</div>
                 <div style={{ fontFamily: 'var(--display)', fontSize: 20, fontWeight: 700 }}>{d.d}</div>
               </button>

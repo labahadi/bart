@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{ session, me, ready, refresh }}>
       <NotificationsProvider userId={me?.rules_accepted_at ? me.id : null}>
         {pausedUntil !== undefined && session && (
-          <div style={{ position: 'sticky', top: 0, zIndex: 30, background: 'var(--ink)', color: '#fff', padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>
+          <div style={{ position: 'sticky', top: 0, zIndex: 30, background: 'var(--navy)', color: '#fff', padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>
             Your account is paused {pausedUntil
               ? `until ${new Date(pausedUntil).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`
               : 'until further notice'}. You can still read your chats.

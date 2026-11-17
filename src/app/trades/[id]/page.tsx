@@ -257,7 +257,7 @@ export default function TradeChat() {
       </button>
     ) : offer.status === 'accepted' ? (
       <button key="meetup" onClick={() => (offer.meet_at ? setDetails(true) : router.push(`/trades/${id}/meetup`))} className="spread"
-        style={{ width: '100%', borderWidth: 0, background: 'var(--ink)', color: '#fff', padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>
+        style={{ width: '100%', borderWidth: 0, background: 'var(--navy)', color: '#fff', padding: '10px 20px', fontSize: 13, fontWeight: 600 }}>
         <span className="row" style={{ gap: 8, minWidth: 0 }}>
           <span style={{ color: 'var(--lime)', display: 'inline-flex', flexShrink: 0 }}><Icon name="pin" size={16} /></span>
           <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -345,7 +345,7 @@ export default function TradeChat() {
             </div>
 
             {(offer.status === 'accepted' || offer.status === 'completed') && (
-          <div style={{ background: 'var(--ink)', color: '#fff', borderRadius: 18, padding: 16 }} className="stack">
+          <div style={{ background: 'var(--navy)', color: '#fff', borderRadius: 18, padding: 16 }} className="stack">
             <div className="row">
               <span style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--lime)', color: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="pin" size={20} />
