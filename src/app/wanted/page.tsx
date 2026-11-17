@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRemembered } from '@/lib/remembered';
 import { supabase } from '@/lib/supabase';
 import { bannedMatch } from '@/lib/banned';
 import { screenText } from '@/lib/screen';
 import { friendlyError, type Listing, type Profile } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
-import { Avatar, BottomNav, ProfileLink } from '@/components/ui';
+import { Avatar, ProfileLink } from '@/components/ui';
 import { useNotifications } from '@/components/Notifications';
 
 // Wanted: what people on campus are looking for (this used to be the ISO board on Campus).
@@ -42,9 +43,9 @@ export default function Wanted() {
   const { me } = useAuth();
   const { unread, markRead } = useNotifications();
   const [tab, setTab] = useState<'yours' | 'all'>('yours');
-  const [isos, setIsos] = useState<Iso[] | null>(null);
-  const [responses, setResponses] = useState<IsoResponse[]>([]);
-  const [closet, setCloset] = useState<Listing[]>([]);
+  const [isos, setIsos] = useRemembered<Iso[] | null>('wanted:isos', null);
+  const [responses, setResponses] = useRemembered<IsoResponse[]>('wanted:responses', []);
+  const [closet, setCloset] = useRemembered<Listing[]>('wanted:closet', []);
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [composing, setComposing] = useState(false);
   const [want, setWant] = useState('');
@@ -265,7 +266,6 @@ export default function Wanted() {
           </>
         )}
       </main>
-      <BottomNav />
     </>
   );
 }

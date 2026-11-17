@@ -2,19 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRemembered } from '@/lib/remembered';
 import { supabase } from '@/lib/supabase';
 import { displayName, type Listing } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
-import { Avatar, BottomNav, ListingCard, Logo } from '@/components/ui';
+import { Avatar, ListingCard, Logo } from '@/components/ui';
 import { Badge, useNotifications } from '@/components/Notifications';
 
 export default function Home() {
   const { me } = useAuth();
   const { counts } = useNotifications();
-  const [listings, setListings] = useState<Listing[] | null>(null);
-  const [stats, setStats] = useState<{ rating: number | null; trades: number } | null>(null);
-  const [inCloset, setInCloset] = useState<number | null>(null);
+  const [listings, setListings] = useRemembered<Listing[] | null>('home:listings', null);
+  const [stats, setStats] = useRemembered<{ rating: number | null; trades: number } | null>('home:stats', null);
+  const [inCloset, setInCloset] = useRemembered<number | null>('home:closet', null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -90,7 +91,6 @@ export default function Home() {
           </div>
         )}
       </main>
-      <BottomNav />
     </>
   );
 }

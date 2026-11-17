@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRemembered } from '@/lib/remembered';
 import { supabase } from '@/lib/supabase';
 import { OFFER_SELECT, displayName, friendlyError, initial, offerGives, sides, turnOf, type Offer } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
-import { BottomNav, ItemThumb } from '@/components/ui';
+import { ItemThumb } from '@/components/ui';
 import { useNotifications } from '@/components/Notifications';
 
 type Last = { offer_id: string; sender_id: string; body: string | null; image_path: string | null; created_at: string };
@@ -24,8 +25,8 @@ const when = (iso: string) => {
 export default function Chats() {
   const { me } = useAuth();
   const { unreadRefs } = useNotifications();
-  const [offers, setOffers] = useState<Offer[] | null>(null);
-  const [last, setLast] = useState<Record<string, Last>>({});
+  const [offers, setOffers] = useRemembered<Offer[] | null>('trades:offers', null);
+  const [last, setLast] = useRemembered<Record<string, Last>>('trades:last', {});
   const [showPast, setShowPast] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -163,7 +164,6 @@ export default function Chats() {
           </div>
         )}
       </main>
-      <BottomNav />
     </>
   );
 }

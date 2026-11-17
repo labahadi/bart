@@ -1,12 +1,13 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { setExtraTerms } from '@/lib/banned';
 import { clearRemember, shouldForgetSession } from '@/lib/remember';
-import { Loading } from './ui';
+import { forgetRemembered } from '@/lib/remembered';
+import { BottomNav, Loading } from './ui';
 import { NotificationsProvider } from './Notifications';
 
 type Me = { id: string; first_name: string | null; last_initial: string | null; rules_accepted_at: string | null; avatar_path?: string | null; class_year?: string | null };
@@ -20,6 +21,7 @@ const PUBLIC = ['/login'];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const lastUser = useRef<string | undefined>(undefined);
   const [me, setMe] = useState<Me | null>(null);
   const [ready, setReady] = useState(false);
   const [pausedUntil, setPausedUntil] = useState<string | null | undefined>(undefined); // undefined = not paused
@@ -60,6 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setReady(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      // A different person (or nobody) is signed in now: drop what the tabs remembered
+      if (s?.user?.id !== lastUser.current) { forgetRemembered(); lastUser.current = s?.user?.id; }
       setSession(s);
       // Defer the query so it doesn't run inside Supabase's auth callback
       setTimeout(() => loadProfile(s), 0);
@@ -93,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           </div>
         )}
         {children}
+        <BottomNav />
       </NotificationsProvider>
     </AuthContext.Provider>
   );
