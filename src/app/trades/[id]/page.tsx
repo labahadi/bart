@@ -204,7 +204,7 @@ export default function TradeChat() {
   const myClash = toConfirm ? clash(new Date(toConfirm), cal, otherName) : null;
   const confirmButtons = (
     <div className="row" style={{ gap: 8 }}>
-      <Link href={`/trades/${id}/meetup`} className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }}>
+      <Link href={`/trades/${id}/meetup`} className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', boxShadow: 'var(--shadow)' }}>
         Suggest another time
       </Link>
       <button className="btn small" disabled={busy} onClick={confirmMeetup}>Confirm</button>
@@ -217,7 +217,7 @@ export default function TradeChat() {
   const answer = (action: 'accept' | 'decline') => act(() => supabase.rpc('respond_offer', { p_offer: id, p_action: action }));
   const turnButtons = (
     <div className="row" style={{ gap: 8 }}>
-      <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }} disabled={busy}
+      <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', boxShadow: 'var(--shadow)' }} disabled={busy}
         onClick={() => answer('decline')}>Decline</button>
       <Link href={`/trades/${id}/counter`} className="btn small" style={{ background: 'var(--surface)', color: 'var(--blue)', border: '1.5px solid var(--blue)' }}>
         Counter

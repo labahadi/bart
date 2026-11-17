@@ -184,7 +184,7 @@ export default function Meetup() {
               <input className="input" placeholder="Search a place or address on campus" maxLength={80}
                 value={query} onChange={(e) => setQuery(e.target.value)} />
               {results.map((r) => (
-                <button key={r.placeId} onClick={() => pick(r)} className="check-row" style={{ minHeight: 48, border: '1px solid var(--border-soft)' }}>
+                <button key={r.placeId} onClick={() => pick(r)} className="check-row" style={{ minHeight: 48, boxShadow: 'var(--shadow)' }}>
                   <span style={{ color: 'var(--muted)', display: 'inline-flex' }}><Icon name="pin" size={18} /></span>
                   <span className="grow" style={{ minWidth: 0 }}>
                     <span className="row-title" style={{ display: 'block' }}>{r.name}</span>
