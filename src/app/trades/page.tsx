@@ -137,7 +137,7 @@ export default function Chats() {
               <div key={o.id} className="card" style={{ padding: '6px 12px 12px' }}>
                 <Row o={o} />
                 <div className="row" style={{ gap: 8 }}>
-                  <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }}
+                  <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', boxShadow: 'var(--shadow)' }}
                     disabled={busyId === o.id} onClick={() => respond(o.id, 'decline')}>Decline</button>
                   <Link href={`/trades/${o.id}/counter`} className="btn small" style={{ background: 'var(--surface)', color: 'var(--blue)', border: '1.5px solid var(--blue)' }}>Counter</Link>
                   <button className="btn small" disabled={busyId === o.id} onClick={() => respond(o.id, 'accept')}>Accept</button>

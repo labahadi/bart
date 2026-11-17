@@ -189,7 +189,7 @@ export default function Wanted() {
                   </span>
                 ) : item && (
                   <div className="row" style={{ gap: 8 }}>
-                    <button className="btn small outline" style={{ width: 'auto', padding: '0 16px', border: '1px solid var(--border)' }} onClick={() => notNow(iso.id)}>Not now</button>
+                    <button className="btn small outline" style={{ width: 'auto', padding: '0 16px', boxShadow: 'var(--shadow)' }} onClick={() => notNow(iso.id)}>Not now</button>
                     <button className="btn small pink grow" onClick={() => respond(iso.id, item.id)}>Offer my {item.title}</button>
                   </div>
                 )}
@@ -206,7 +206,7 @@ export default function Wanted() {
                 <input className="input" placeholder="What can you give for it?" maxLength={120} value={canOffer} onChange={(e) => setCanOffer(e.target.value)} />
                 {bad && <p className="error-text" style={{ margin: 0 }}>&quot;{bad.term}&quot; isn&apos;t allowed on bart.</p>}
                 <div className="row" style={{ gap: 8 }}>
-                  <button className="btn small outline" style={{ border: '1px solid var(--border)' }} onClick={() => setComposing(false)}>Cancel</button>
+                  <button className="btn small outline" style={{ boxShadow: 'var(--shadow)' }} onClick={() => setComposing(false)}>Cancel</button>
                   <button className="btn small pink" disabled={want.trim().length < 2 || !!bad} onClick={post}>Post</button>
                 </div>
               </div>

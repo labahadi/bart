@@ -99,7 +99,7 @@ export default function PersonProfile() {
           {closet.length === 0 && <div className="empty">Nothing up for trade right now.</div>}
           {closet.map((l) => (
             <Link key={l.id} href={`/item/${l.id}`} className="row"
-              style={{ background: 'var(--surface)', borderRadius: 14, padding: '10px 12px', color: 'var(--ink)', border: '1px solid var(--border-soft)', gap: 12 }}>
+              style={{ background: 'var(--surface)', borderRadius: 22, padding: '10px 12px', color: 'var(--ink)', boxShadow: 'var(--shadow)', gap: 12 }}>
               <ItemThumb item={l} size={44} />
               <span className="grow">
                 <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{l.title}</span>
@@ -121,7 +121,7 @@ export default function PersonProfile() {
           <span style={{ fontSize: 15, fontWeight: 700 }}>Block {person.first_name}?</span>
           <span className="meta">Ends any open trade. They won&apos;t be told.</span>
           <div className="row" style={{ gap: 8 }}>
-            <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--border)' }} onClick={() => setConfirm(false)}>Cancel</button>
+            <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', boxShadow: 'var(--shadow)' }} onClick={() => setConfirm(false)}>Cancel</button>
             <button className="btn small" style={{ background: 'var(--error)' }} disabled={busy} onClick={() => setBlock(true)}>{busy ? 'Blocking…' : 'Block'}</button>
           </div>
         </div>

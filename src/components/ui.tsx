@@ -22,9 +22,9 @@ export function BottomNav() {
   const item = (href: string, icon: IconName, label: string, badge = 0) => {
     const on = href === '/' ? path === '/' : path.startsWith(href);
     return (
-      <Link href={href} className={on ? 'on' : ''}>
-        <span style={{ position: 'relative', display: 'inline-flex' }}><Icon name={icon} size={22} /><Badge n={badge} /></span>
-        {label}
+      <Link href={href} className={on ? 'on' : ''} aria-label={label}>
+        <span style={{ position: 'relative', display: 'inline-flex' }}><Icon name={icon} size={22} stroke={2} /><Badge n={badge} /></span>
+        <span className="nav-label">{label}</span>
       </Link>
     );
   };
