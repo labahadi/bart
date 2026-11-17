@@ -219,16 +219,20 @@ textarea.input { height: auto; padding: 14px 16px; resize: vertical; line-height
 :root { --ease: cubic-bezier(0.2, 0.8, 0.2, 1); }
 
 /* New screen: content fades up a few pixels */
-@keyframes enter-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes soft-in { from { opacity: 0.35; } to { opacity: 1; } }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pop-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
 @keyframes sheet-up { from { transform: translateY(24px); opacity: 0.6; } to { transform: none; opacity: 1; } }
-.screen { animation: enter-up 0.26s var(--ease) both; }
-.action-bar { animation: enter-up 0.3s var(--ease) both; }
-.center-screen { animation: fade-in 0.2s ease both; }
+.screen { animation: soft-in 0.22s ease-out both; }
+.action-bar { animation: soft-in 0.22s ease-out both; }
+/* Lists fade in when their data arrives, instead of popping */
+.grid2, .screen > .stack { animation: soft-in 0.25s ease-out both; }
+/* The loading circle only appears if loading takes more than about half a second */
+.spinner { animation: spin 0.8s linear infinite, fade-in 0.2s ease 0.5s both; }
+.center-screen .spinner { animation-delay: 0s, 0.6s; }
 
 /* Taps: everything you can press gives a little */
-.btn, .chip, .icon-btn, .text-btn, .check-row, .round-send, .listing-card, .segmented button, .nav a, a.card, button.card {
+.btn, .chip, .icon-btn, .text-btn, .check-row, .round-send, .listing-card, .segmented button, a.card, button.card {
   transition: transform 0.14s var(--ease), background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
 }
 .btn:active:not(:disabled), .chip:active, .icon-btn:active, .round-send:active:not(:disabled), .check-row:active,
@@ -242,9 +246,13 @@ a.card:active, button.card:active, .segmented button:active { transform: scale(0
 }
 .listing-card .img { transition: box-shadow 0.2s ease; }
 
-/* Bottom bar: the open tab's pill eases in */
-.nav a { transition: background-color 0.25s var(--ease), padding 0.25s var(--ease), color 0.2s ease; }
-.nav a.on .nav-label { animation: fade-in 0.25s ease both; }
+/* Bottom bar: one black pill slides to the open tab */
+.nav a { position: relative; z-index: 1; transition: color 0.25s ease, padding 0.3s var(--ease); }
+.nav a.on { background: transparent; }
+.nav a.on .nav-label { animation: fade-in 0.3s ease 0.08s both; }
+.nav a.on svg { transition: color 0.25s ease; }
+.nav-pill { position: absolute; left: 0; top: 10px; height: 46px; border-radius: 999px; background: var(--ink); z-index: 0; pointer-events: none; }
+.nav-pill.animate { transition: transform 0.38s var(--ease), width 0.38s var(--ease); }
 
 /* Things that appear in place */
 .bubble { animation: pop-in 0.2s var(--ease) both; }

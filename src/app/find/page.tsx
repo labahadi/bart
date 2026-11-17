@@ -2,18 +2,19 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { recall, remember } from '@/lib/remembered';
 import { supabase } from '@/lib/supabase';
 import { CATEGORIES, type Category, type Listing } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
-import { BottomNav, ListingCard } from '@/components/ui';
+import { ListingCard } from '@/components/ui';
 
 // Find: search everything that's up for trade (this used to be the search on Home)
 export default function Find() {
   const { me } = useAuth();
   const [category, setCategory] = useState<Category | 'all'>('all');
   const [query, setQuery] = useState('');
-  const [listings, setListings] = useState<Listing[] | null>(null);
+  const [listings, setListings] = useState<Listing[] | null>(() => recall<Listing[]>('find:all') ?? null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -27,7 +28,10 @@ export default function Find() {
       if (term) q = q.or(`title.ilike.%${term}%,wants.ilike.%${term}%,description.ilike.%${term}%`);
       const { data, error } = await q;
       if (cancelled) return;
-      if (error) setError(error.message); else { setError(''); setListings(data as Listing[]); }
+      if (error) setError(error.message); else {
+        setError(''); setListings(data as Listing[]);
+        if (category === 'all' && !term) remember('find:all', data);
+      }
     }, query ? 250 : 0);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [category, query]);
@@ -82,7 +86,6 @@ export default function Find() {
           <Link href={`/wanted?ask=${encodeURIComponent(term || '1')}`} className="btn pink small" style={{ width: 'auto', padding: '0 16px', height: 40, borderRadius: 10, flexShrink: 0 }}>Ask</Link>
         </div>
       </main>
-      <BottomNav />
     </>
   );
 }
