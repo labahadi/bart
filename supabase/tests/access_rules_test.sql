@@ -399,17 +399,18 @@ set role authenticated;
 select t.as_user('00000000-0000-0000-0000-00000000000a');
 select t.expect('a liked post this week beats a bigger one from last week',
   (select post_id = (select post_id from post2) and not last_week from featured_trade()));
--- No likes this week: last week's winner stays up, marked as last week
+-- A trade shared this week counts even before anyone votes; last week's never does
 select t.as_user('00000000-0000-0000-0000-00000000000c');
 delete from post_likes where post_id = (select post_id from post2);
-select t.expect('no likes this week shows last week''s winner',
-  (select post_id = (select post_id from post1) and last_week from featured_trade()));
--- Two weeks ago doesn't count
+select t.expect('this week''s trade still shows with no votes yet',
+  (select post_id = (select post_id from post2) and not last_week from featured_trade()));
+-- Nothing shared this week: no Trade of the Week at all (the app says "No trade this week")
 reset role;
-update feed_posts set created_at = created_at - interval '7 days' where id = (select post_id from post1);
+update feed_posts set created_at = ((date_trunc('week', now() at time zone 'America/New_York') - interval '2 days') at time zone 'America/New_York')
+ where created_at at time zone 'America/New_York' >= date_trunc('week', now() at time zone 'America/New_York');
 set role authenticated;
 select t.as_user('00000000-0000-0000-0000-00000000000c');
-select t.expect('nothing from two weeks ago', not exists (select 1 from featured_trade()));
+select t.expect('no trades this week means no Trade of the Week', not exists (select 1 from featured_trade()));
 
 select t.as_user('00000000-0000-0000-0000-00000000000a');
 update profiles set class_year = '2028' where id = auth.uid();

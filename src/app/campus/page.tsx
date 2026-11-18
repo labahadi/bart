@@ -112,6 +112,18 @@ function Feed() {
 
   return (
     <>
+      {!top && (
+        <div className="totw">
+          <span className="totw-dot" aria-hidden="true" />
+          <div className="spread">
+            <span className="row" style={{ gap: 6, fontSize: 13, fontWeight: 800, letterSpacing: 0.4 }}>
+              <Icon name="trophy" size={17} /> TRADE OF THE WEEK
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.9, paddingRight: 36 }}>{weekRange(mondayOf(new Date()))}</span>
+          </div>
+          <div className="totw-title">No trade this week. <b>Trade something and vote!</b></div>
+        </div>
+      )}
       {top && (
         <div className="totw">
           <span className="totw-dot" aria-hidden="true" />
@@ -119,7 +131,7 @@ function Feed() {
             <span className="row" style={{ gap: 6, fontSize: 13, fontWeight: 800, letterSpacing: 0.4 }}>
               <Icon name="trophy" size={17} /> TRADE OF THE WEEK
             </span>
-            <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.9, paddingRight: 36 }}>{featured!.last_week ? 'Last week' : weekRange(featured!.week_start)}</span>
+            <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.9, paddingRight: 36 }}>{weekRange(featured!.week_start)}</span>
           </div>
           <div className="totw-title">
             <b>{top.gave}</b> for <b>{top.got}</b>
@@ -160,7 +172,7 @@ function Feed() {
             <div className="grow" style={{ fontSize: 14 }}>
               <ProfileLink id={p.author_id}><b>{p.author_first}{p.author_initial ? ` ${p.author_initial}.` : ''}</b></ProfileLink> traded
             </div>
-            {p.id === top?.id && <span className="pill pink-tint">{featured?.last_week ? 'Last week' : 'Leading'}</span>}
+            {p.id === top?.id && <span className="pill pink-tint">Leading</span>}
             <span className="meta">{ago(p.created_at)}</span>
           </div>
           <div className="swap-pair">
