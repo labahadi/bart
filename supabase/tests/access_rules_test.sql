@@ -226,6 +226,17 @@ select t.expect('items marked traded',
 select t.expect('Jordan''s stats show the rating',
   (select rating = 5.0 and trades = 1 from trader_stats('00000000-0000-0000-0000-00000000000b')));
 select t.expect_error('cannot rate yourself 6 stars', format($$select rate_trade(%L, 6)$$, (select offer_id from ids)), 'check');
+-- Past trade recap: see their rating of you only after you've rated them
+select t.expect('before rating, Jordan sees that Alex rated but not the score',
+  (select my_stars is null and their_stars is null and they_rated from trade_reviews((select offer_id from ids))));
+select rate_trade((select offer_id from ids), 4);
+select t.expect('after rating, Jordan sees both',
+  (select my_stars = 4 and their_stars = 5 from trade_reviews((select offer_id from ids))));
+select t.as_user('00000000-0000-0000-0000-00000000000a');
+select t.expect('Alex sees both too', (select my_stars = 5 and their_stars = 4 from trade_reviews((select offer_id from ids))));
+select t.as_user('00000000-0000-0000-0000-00000000000c');
+select t.expect_error('outsiders cannot see a trade''s ratings', format($$select * from trade_reviews(%L)$$, (select offer_id from ids)), 'not found');
+select t.as_user('00000000-0000-0000-0000-00000000000b');
 
 -- Reports: anonymous, write-only, 3 reports hides a listing
 select t.as_user('00000000-0000-0000-0000-00000000000a');

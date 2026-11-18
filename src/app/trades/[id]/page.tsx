@@ -8,6 +8,7 @@ import { uploadChatPhoto } from '@/lib/photos';
 import { blockedAnywhere } from '@/lib/banned';
 import { OFFER_SELECT, displayName, friendlyError, offerGives, sides, turnOf, type Offer } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
+import { PastRecap } from '@/components/PastRecap';
 import { clash, freeTimes, type FreeTimes } from '@/lib/calendar';
 import { nyParts } from '@/lib/time';
 import { Icon } from '@/components/Icon';
@@ -293,6 +294,14 @@ export default function TradeChat() {
       </div>
 
       <main className="screen" style={{ paddingBottom: 100, gap: 12 }}>
+        {/* A finished trade opens with a recap: outcome, items, ratings, Campus likes and comments */}
+        {(offer.status === 'completed' || offer.status === 'declined' || offer.status === 'cancelled') && (
+          <>
+            <PastRecap offer={offer} meId={me.id} otherName={otherName} place={offer.meet_custom ?? spot?.name ?? ''} onRate={() => setDetails(true)} />
+            <p className="recap-divider">{messages.length ? 'Messages' : 'No messages in this trade'}</p>
+          </>
+        )}
+
         {/* Messages */}
         {messages.map((m) => {
           const mine = m.sender_id === me.id;
