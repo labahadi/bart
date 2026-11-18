@@ -50,7 +50,7 @@ export function BottomNav() {
     const on = href === '/' ? path === '/' : path.startsWith(href);
     return (
       <Link href={href} className={on ? 'on' : ''} aria-label={label} aria-current={on ? 'page' : undefined}>
-        <span style={{ position: 'relative', display: 'inline-flex' }}><Icon name={icon} size={22} stroke={2} /><Badge n={badge} /></span>
+        <span style={{ position: 'relative', display: 'inline-flex' }}><Icon name={icon} size={22} stroke={2} /><Badge n={on ? 0 : badge} /></span>
         <span className="nav-label">{label}</span>
       </Link>
     );
