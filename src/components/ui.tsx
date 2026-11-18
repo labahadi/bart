@@ -39,7 +39,7 @@ export function BottomNav() {
     // Re-measure when the font finishes loading or the window changes size
     const ro = new ResizeObserver(place);
     ro.observe(nav);
-    nav.querySelectorAll('a').forEach((a) => ro.observe(a));
+    nav.querySelectorAll('a').forEach((a) => ro.observe(a, { box: 'border-box' }));
     return () => ro.disconnect();
   }, [path, show]);
 

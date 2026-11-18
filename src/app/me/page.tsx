@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { classLabel, displayName, OFFER_SELECT, sides, type Listing, type Offer } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
-import { Avatar, ItemThumb, PushHeader } from '@/components/ui';
+import { Avatar, ItemThumb } from '@/components/ui';
 import { useNotifications } from '@/components/Notifications';
 
 // Your profile: opened from the card on Home. Account things (photo, name, Google Calendar,
@@ -43,42 +43,40 @@ export default function Me() {
   const rows = tab === 'closet' ? current : saved;
 
   return (
-    <main className="screen no-nav">
-      <PushHeader title="Profile" back="/"
-        right={<Link href="/settings" className="chip row" style={{ gap: 6, height: 40, display: 'inline-flex', alignItems: 'center', color: 'var(--ink)' }}>
+    <main className="screen no-nav profile-screen">
+      <div className="profile-band" aria-hidden="true">
+        <span style={{ right: -50, top: -60, width: 170, height: 170, background: 'var(--pink)' }} />
+        <span style={{ left: 40, bottom: 30, width: 46, height: 46, background: 'var(--lime)' }} />
+      </div>
+      <div className="spread" style={{ position: 'relative' }}>
+        <Link href="/" className="icon-btn" aria-label="Back"><Icon name="back" size={20} stroke={2.2} /></Link>
+        <Link href="/settings" className="chip row" style={{ gap: 6, height: 44, display: 'inline-flex', alignItems: 'center', color: 'var(--ink)', borderRadius: 16 }}>
           <Icon name="edit" size={16} /> Edit profile
-        </Link>} />
-
-      <div className="row" style={{ gap: 16 }}>
-        <span style={{ display: 'inline-flex', borderRadius: 999, boxShadow: '0 0 0 3px #fff, 0 0 0 5px var(--pink)', margin: 5 }}>
-          <Avatar profile={me} size={80} solid="pink" photo={me.avatar_path} />
-        </span>
-        <div className="stack" style={{ gap: 6 }}>
-          <div className="display" style={{ fontSize: 24 }}>{displayName(me)}</div>
-          <span className="pill blue-tint" style={{ alignSelf: 'flex-start' }}><Icon name="shield" size={14} /> Verified student</span>
-          {me.class_year && <span className="meta">{classLabel(me.class_year)}</span>}
-        </div>
+        </Link>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+      <div className="stack" style={{ alignItems: 'center', textAlign: 'center', gap: 6, marginTop: 30, position: 'relative' }}>
+        <span style={{ display: 'inline-flex', borderRadius: 999, boxShadow: '0 0 0 5px var(--bg)' }}>
+          <Avatar profile={me} size={96} solid="pink" photo={me.avatar_path} />
+        </span>
+        <h1 className="display" style={{ fontSize: 28, marginTop: 8, letterSpacing: -1 }}>{displayName(me)}</h1>
+        <span className="pill blue-tint" style={{ fontSize: 13 }}>
+          <Icon name="shield" size={14} /> Verified{me.class_year ? ` · ${classLabel(me.class_year)}` : ' student'}
+        </span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 }}>
         {[
-          [String(stats?.trades ?? 0), 'Trades'],
-          [stats?.rating ? `${stats.rating} ★` : '–', 'Rating'],
-          [String(current.length), 'In closet'],
-        ].map(([n, label]) => (
-          <div key={label} className="card" style={{ borderRadius: 20, textAlign: 'center', padding: 12 }}>
-            <div className="display" style={{ fontSize: 22 }}>{n}</div>
-            <div className="meta">{label}</div>
+          [String(stats?.trades ?? 0), stats?.trades === 1 ? 'trade' : 'trades', false],
+          [stats?.rating ? `${stats.rating}` : '–', 'rating', false],
+          [String(traded), 'kept from trash', true],
+        ].map(([n, label, lime]) => (
+          <div key={label as string} className="card" style={{ borderRadius: 20, textAlign: 'center', padding: 12, ...(lime ? { background: 'var(--lime)', boxShadow: 'none' } : {}) }}>
+            <div className="display" style={{ fontSize: 22 }}>{n}{label === 'rating' && stats?.rating ? <span style={{ fontSize: 16 }}> ★</span> : null}</div>
+            <div className="meta" style={lime ? { color: 'var(--text-2)' } : undefined}>{label}</div>
           </div>
         ))}
       </div>
-
-      {traded > 0 && (
-        <div className="row" style={{ background: 'var(--green-tint)', borderRadius: 18, padding: '12px 14px', fontSize: 14, gap: 10 }}>
-          <Icon name="check" size={20} />
-          <span><b>{traded} item{traded === 1 ? '' : 's'}</b> kept out of the trash</span>
-        </div>
-      )}
 
       <div className="segmented">
         <button className={tab === 'closet' ? 'on' : ''} onClick={() => setTab('closet')}>Closet</button>
@@ -102,11 +100,6 @@ export default function Me() {
                 : <span style={{ color: 'var(--pink)' }}><Icon name="heart" size={18} fill="currentColor" stroke={0} /></span>}
             </Link>
           ))}
-          {tab === 'closet' && (
-            <Link href="/post" className="btn small" style={{ background: 'transparent', color: 'var(--pink-text)', border: '1.5px dashed var(--pink)' }}>
-              <Icon name="plus" size={18} stroke={2.4} /> Add to your closet
-            </Link>
-          )}
         </div>
       )}
 
@@ -128,6 +121,9 @@ export default function Me() {
           })}
         </div>
       )}
+      <Link href="/post" className="fab" aria-label="Add to your closet">
+        <Icon name="plus" size={20} stroke={2.8} /> Add
+      </Link>
     </main>
   );
 }

@@ -3,12 +3,30 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Icon } from '@/components/Icon';
-import { PushHeader } from '@/components/ui';
+import { Icon, type IconName } from '@/components/Icon';
 import { useNotifications, type Notification } from '@/components/Notifications';
 
-const ICON = { trades: 'swap', campus: 'people', me: 'heart' } as const;
-const TINT = { trades: 'var(--blue-tint)', campus: 'var(--pink-tint)', me: 'var(--green-tint)' } as const;
+// One look per kind of update: icon, tint, and the button shown while it's new
+const KIND: Record<string, { icon: IconName; tint: string; action?: string }> = {
+  offer:    { icon: 'swap',      tint: 'var(--blue-tint)',  action: 'View offer' },
+  counter:  { icon: 'swap',      tint: 'var(--blue-tint)',  action: 'View counter' },
+  status:   { icon: 'check',     tint: 'var(--green-tint)', action: 'Open trade' },
+  meetup:   { icon: 'calendar',  tint: 'var(--pink-tint)',  action: 'Open meetup' },
+  message:  { icon: 'chat',      tint: 'var(--blue-tint)',  action: 'Reply' },
+  like:     { icon: 'heart',     tint: 'var(--pink-tint)' },
+  comment:  { icon: 'chat',      tint: 'var(--pink-tint)',  action: 'See comment' },
+  iso:      { icon: 'megaphone', tint: 'var(--green-tint)', action: 'Open Wanted' },
+  saved:    { icon: 'heart',     tint: 'var(--pink-tint)' },
+  paused:   { icon: 'warning',   tint: 'var(--pink-tint)' },
+  unpaused: { icon: 'check',     tint: 'var(--green-tint)' },
+};
+const FALLBACK = { trades: 'swap', campus: 'people', me: 'person' } as const;
+// Updates that start with the other person's name get it in bold
+const STARTS_WITH_NAME = new Set(['offer', 'counter', 'meetup', 'message', 'like', 'comment', 'iso']);
+
+const TABS: { key: 'all' | Notification['tab']; label: string }[] = [
+  { key: 'all', label: 'All' }, { key: 'trades', label: 'Trades' }, { key: 'campus', label: 'Campus' }, { key: 'me', label: 'You' },
+];
 
 const ago = (iso: string) => {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -18,10 +36,18 @@ const ago = (iso: string) => {
   return `${Math.round(m / 1440)}d`;
 };
 
+function Body({ n }: { n: Notification }) {
+  const named = STARTS_WITH_NAME.has(n.kind)
+    || (n.kind === 'status' && !n.body.startsWith('The ') && !n.body.startsWith('Trade done'));
+  const m = named ? n.body.match(/^([^\s:]+)([\s:].*)$/s) : null;
+  return m ? <><b>{m[1]}</b>{m[2]}</> : <>{n.body}</>;
+}
+
 export default function Activity() {
   const router = useRouter();
   const { unread, markRead } = useNotifications();
   const [items, setItems] = useState<Notification[] | null>(null);
+  const [tab, setTab] = useState<(typeof TABS)[number]['key']>('all');
 
   // Recent activity, read and unread (refreshes when new ones arrive)
   useEffect(() => {
@@ -35,29 +61,41 @@ export default function Activity() {
     router.push(n.kind === 'iso' ? '/wanted' : n.link);
   }
 
+  const shown = items?.filter((n) => tab === 'all' || n.tab === tab);
+
   return (
     <main className="screen no-nav">
-      <PushHeader title="Activity" back="/"
-        right={unread.length > 0 ? <button className="text-btn" onClick={() => markRead()}>Mark all read</button> : undefined} />
+      <div className="spread">
+        <button className="icon-btn" aria-label="Back" onClick={() => router.push('/')}><Icon name="back" size={20} stroke={2.2} /></button>
+        {unread.length > 0 && <button className="text-btn" onClick={() => markRead()}>Mark all read</button>}
+      </div>
+      <h1 className="title-tab">Activity</h1>
+
+      <div className="segmented">
+        {TABS.map((t) => (
+          <button key={t.key} className={tab === t.key ? 'on' : ''} onClick={() => setTab(t.key)}>{t.label}</button>
+        ))}
+      </div>
 
       {!items && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
-      {items?.length === 0 && <div className="empty">Nothing yet.</div>}
+      {shown?.length === 0 && <div className="empty">Nothing here yet.</div>}
 
       <div className="stack" style={{ gap: 6 }}>
-        {items?.map((n) => {
+        {shown?.map((n) => {
           const isNew = unread.some((u) => u.id === n.id);
+          const k = KIND[n.kind];
           return (
-            <button key={n.id} onClick={() => open(n)} className="row"
-              style={{ textAlign: 'left', width: '100%', padding: '12px 14px', borderRadius: 16, gap: 12,
-                background: isNew ? 'var(--surface)' : 'transparent', border: isNew ? '1px solid var(--border-soft)' : '1px solid transparent' }}>
-              <span style={{ width: 40, height: 40, borderRadius: 12, background: TINT[n.tab], display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Icon name={ICON[n.tab]} size={20} />
+            <button key={n.id} onClick={() => open(n)} className={`activity-row${isNew ? ' new' : ''}`}>
+              <span className="activity-icon" style={{ background: k?.tint ?? 'var(--blue-tint)' }}>
+                <Icon name={k?.icon ?? FALLBACK[n.tab]} size={20} />
               </span>
-              <span className="grow">
-                <span style={{ display: 'block', fontSize: 14, fontWeight: isNew ? 600 : 400, lineHeight: 1.35 }}>{n.body}</span>
-                <span className="meta">{ago(n.created_at)}</span>
+              <span className="grow stack" style={{ gap: 8 }}>
+                <span style={{ fontSize: 15, lineHeight: 1.4 }}>
+                  <Body n={n} /> <span className="meta" style={{ fontSize: 13 }}>· {ago(n.created_at)}</span>
+                </span>
+                {isNew && k?.action && <span className="pill ink" style={{ alignSelf: 'flex-start', height: 34, padding: '0 14px', fontSize: 13 }}>{k.action}</span>}
               </span>
-              {isNew && <span style={{ width: 10, height: 10, borderRadius: 999, background: 'var(--pink)', flexShrink: 0 }} />}
+              {isNew && <span className="activity-dot" />}
             </button>
           );
         })}

@@ -42,7 +42,7 @@ export default function SharedMeetup() {
             {plan.first_name} is meeting someone from <span style={{ color: 'var(--pink)' }}>bart</span>
           </h1>
 
-          <div style={{ background: 'var(--ink)', color: '#fff', borderRadius: 18, padding: 18 }} className="stack">
+          <div style={{ background: 'var(--navy)', color: '#fff', borderRadius: 18, padding: 18 }} className="stack">
             <div className="row" style={{ alignItems: 'flex-start' }}>
               <span style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--lime)', color: 'var(--ink)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Icon name="pin" size={20} />
