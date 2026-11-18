@@ -249,8 +249,9 @@ a.card:active, button.card:active, .segmented button:active { transform: scale(0
 
 /* Bottom bar: one black pill slides to the open tab */
 .nav a { position: relative; z-index: 1; transition: color 0.25s ease; }
-.nav a:focus { outline: none; }
-.nav a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 999px; }
+.nav a:focus, .nav a:focus-visible { outline: none; }
+/* Keyboard users: a soft ring inside the tab instead of a blue outline around it */
+.nav a:focus-visible:not(.on) { box-shadow: inset 0 0 0 2px var(--blue-tint); }
 .nav a.on { background: transparent; }
 .nav a.on .nav-label { animation: fade-in 0.3s ease 0.08s both; }
 .nav a.on svg { transition: color 0.25s ease; }
