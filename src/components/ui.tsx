@@ -23,17 +23,20 @@ export function BottomNav() {
   const path = usePathname();
   const { counts, unread } = useNotifications();
   const navRef = useRef<HTMLElement>(null);
-  const [pill, setPill] = useState<{ x: number; w: number; animate: boolean } | null>(null);
+  const [pill, setPill] = useState<{ x: number; w: number; animate: boolean; key: string } | null>(null);
   const show = TAB_PATHS.includes(path);
 
-  // Measure the open tab and move the pill there. The first placement doesn't animate.
+  // Measure the open tab (to the fraction of a pixel) and put the pill exactly behind it.
+  // On a tab change the pill pops up from the tab's own center, so it's centered the whole time.
   useLayoutEffect(() => {
     const nav = navRef.current;
     if (!nav) { setPill(null); return; }
     const place = () => {
       const on = nav.querySelector<HTMLElement>('a.on');
       if (!on) return;
-      setPill((p) => ({ x: on.offsetLeft, w: on.offsetWidth, animate: p !== null }));
+      const x = on.getBoundingClientRect().left - nav.getBoundingClientRect().left - nav.clientLeft;
+      const w = on.getBoundingClientRect().width;
+      setPill((p) => ({ x, w, animate: p !== null && p.key !== path ? true : (p?.animate ?? false), key: path }));
     };
     place();
     // Re-measure when the font finishes loading or the window changes size
@@ -58,8 +61,8 @@ export function BottomNav() {
   return (
     <nav className="nav" aria-label="Main" ref={navRef}>
       {pill && (
-        <span className={`nav-pill${pill.animate ? ' animate' : ''}`} aria-hidden="true"
-          style={{ transform: `translateX(${pill.x}px)`, width: pill.w }} />
+        <span key={pill.key} className={`nav-pill${pill.animate ? ' animate' : ''}`} aria-hidden="true"
+          style={{ left: pill.x, width: pill.w }} />
       )}
       {item('/', 'home', 'Home')}
       {item('/find', 'search', 'Find')}

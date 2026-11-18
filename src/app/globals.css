@@ -255,8 +255,9 @@ a.card:active, button.card:active, .segmented button:active { transform: scale(0
 .nav a.on { background: transparent; }
 .nav a.on .nav-label { animation: fade-in 0.3s ease 0.08s both; }
 .nav a.on svg { transition: color 0.25s ease; }
-.nav-pill { position: absolute; left: 0; top: 10px; height: 46px; border-radius: 999px; background: var(--navy); z-index: 0; pointer-events: none; }
-.nav-pill.animate { transition: transform 0.38s var(--ease), width 0.38s var(--ease); }
+.nav-pill { position: absolute; top: 10px; transform-origin: center; height: 46px; border-radius: 999px; background: var(--navy); z-index: 0; pointer-events: none; }
+.nav-pill.animate { animation: nav-pop 0.32s var(--ease) both; }
+@keyframes nav-pop { from { transform: scale(0.6); opacity: 0; } 60% { opacity: 1; } to { transform: scale(1); opacity: 1; } }
 
 /* Things that appear in place */
 .bubble { animation: pop-in 0.2s var(--ease) both; }
