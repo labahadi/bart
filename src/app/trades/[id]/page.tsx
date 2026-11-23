@@ -8,6 +8,7 @@ import { uploadChatPhoto } from '@/lib/photos';
 import { blockedAnywhere } from '@/lib/banned';
 import { OFFER_SELECT, displayName, friendlyError, offerGives, sides, turnOf, type Offer } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
+import { TradeLockedIn } from '@/components/TradeLockedIn';
 import { PastRecap } from '@/components/PastRecap';
 import { clash, freeTimes, type FreeTimes } from '@/lib/calendar';
 import { nyParts } from '@/lib/time';
@@ -66,6 +67,9 @@ export default function TradeChat() {
   const { me } = useAuth();
   const router = useRouter();
   const { unreadRefs, markRead } = useNotifications();
+  // Remember whether this trade had unread news when it opened (marking it read below clears it)
+  const hadNews = useRef(false);
+  if (unreadRefs.has(id)) hadNews.current = true;
   useEffect(() => { if (unreadRefs.has(id)) markRead({ ref: id }); }, [unreadRefs, id, markRead]);
   const [offer, setOffer] = useState<Offer | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -79,6 +83,10 @@ export default function TradeChat() {
   const [missing, setMissing] = useState(false);
   const [details, setDetails] = useState(false);
   const [cal, setCal] = useState<FreeTimes | null>(null);
+  // "Trade locked in!" shows once per trade, when an acceptance is new to this person
+  const [celebrate, setCelebrate] = useState<null | { youAccepted: boolean }>(null);
+  const justAccepted = useRef(false);
+  const lastStatus = useRef<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -115,6 +123,20 @@ export default function TradeChat() {
   }, [messages, photoUrls]);
 
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages.length]);
+
+  // New acceptance = I just tapped Accept, it flipped to accepted while the chat was open,
+  // or it opened with unread news. Old accepted trades don't celebrate.
+  useEffect(() => {
+    if (!offer) return;
+    const before = lastStatus.current;
+    lastStatus.current = offer.status;
+    if (offer.status !== 'accepted') return;
+    const fresh = justAccepted.current || before === 'pending' || (before === null && hadNews.current);
+    if (!fresh) return;
+    const key = `bart-locked-${offer.id}`;
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch {}
+    setCelebrate({ youAccepted: !!justAccepted.current });
+  }, [offer]);
 
   async function postMessage(fields: { body?: string; image_path?: string }) {
     if (fields.body && blockedAnywhere(fields.body)) { setError("That message includes words that aren't allowed on bart."); return false; }
@@ -215,7 +237,10 @@ export default function TradeChat() {
   const canChat = offer.status === 'pending' || offer.status === 'accepted';
 
   const { get, give } = sides(offer, me.id);
-  const answer = (action: 'accept' | 'decline') => act(() => supabase.rpc('respond_offer', { p_offer: id, p_action: action }));
+  const answer = (action: 'accept' | 'decline') => {
+    if (action === 'accept') justAccepted.current = true;
+    return act(() => supabase.rpc('respond_offer', { p_offer: id, p_action: action }));
+  };
   const turnButtons = (
     <div className="row" style={{ gap: 8 }}>
       <button className="btn small" style={{ background: 'var(--surface)', color: 'var(--ink)', boxShadow: 'var(--shadow)' }} disabled={busy}
@@ -436,6 +461,10 @@ export default function TradeChat() {
             onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} />
           <button className="round-send" aria-label="Send" disabled={!text.trim()} onClick={send}><Icon name="send" size={20} /></button>
         </div>
+      )}
+      {celebrate && (
+        <TradeLockedIn otherName={otherName} youAccepted={celebrate.youAccepted} give={give} get={get}
+          planHref={offer.meet_at ? null : `/trades/${id}/meetup`} onClose={() => setCelebrate(null)} />
       )}
     </>
   );
