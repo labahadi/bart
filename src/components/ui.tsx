@@ -3,10 +3,12 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Icon, type IconName } from './Icon';
+import { Icon } from './Icon';
 import { Badge, useNotifications } from './Notifications';
 import { photoUrl } from '@/lib/supabase';
-import { CATEGORY_ICON, CATEGORY_TINT, type Listing, type Profile, initial } from '@/lib/trade';
+import { CATEGORY_ICON, artColors, artColorsFor, type Category, type Listing, type Profile, initial } from '@/lib/trade';
+import { SoftIcon, type SoftIconName } from './SoftIcon';
+import { useSaved } from '@/lib/saves';
 
 // The brand-kit logo (horizontal, color). Drawn as shapes, so no font is needed.
 export function Logo({ height = 30 }: { height?: number }) {
@@ -49,11 +51,11 @@ export function BottomNav() {
   if (!show) return null;
   // Answers to your "Looking for" posts are campus notifications of kind 'iso'; they badge Wanted instead
   const wanted = unread.filter((n) => n.kind === 'iso').length;
-  const item = (href: string, icon: IconName, label: string, badge = 0) => {
+  const item = (href: string, icon: SoftIconName, label: string, badge = 0) => {
     const on = href === '/' ? path === '/' : path.startsWith(href);
     return (
       <Link href={href} className={on ? 'on' : ''} aria-label={label} aria-current={on ? 'page' : undefined}>
-        <span style={{ position: 'relative', display: 'inline-flex' }}><Icon name={icon} size={22} stroke={2} /><Badge n={on ? 0 : badge} /></span>
+        <span style={{ position: 'relative', display: 'inline-flex' }}><SoftIcon name={icon} size={23} detail={on ? 'var(--navy)' : 'var(--surface)'} /><Badge n={on ? 0 : badge} /></span>
         <span className="nav-label">{label}</span>
       </Link>
     );
@@ -111,12 +113,31 @@ export function Avatar({ profile, size = 40, solid, photo }: {
   );
 }
 
-export function ItemImage({ listing, iconSize = 38 }: { listing: Pick<Listing, 'category' | 'photo_paths'>; iconSize?: number }) {
+// Items without a photo show their category's picture: a soft card with a big circle in the
+// top-right corner and the picture in the opposite color (see artColors in lib/trade).
+const ART_HEX = { blue: 'var(--blue)', pink: 'var(--pink)' } as const;
+export function ItemArt({ category, colors, size = 54, corner = true }: {
+  category: Category; colors?: readonly [string, string]; size?: number; corner?: boolean;
+}) {
+  const [card, fg] = colors ?? artColorsFor(category);
+  return (
+    <>
+      {corner && <span className={`art-corner art-corner-${card}`} aria-hidden="true" />}
+      <span style={{ position: 'relative', display: 'inline-flex' }}>
+        <SoftIcon name={CATEGORY_ICON[category]} size={size} color={ART_HEX[fg as 'blue' | 'pink']} detail={`var(--${card}-tint)`} />
+      </span>
+    </>
+  );
+}
+
+export function ItemImage({ listing, colors, iconSize = 54 }: {
+  listing: Pick<Listing, 'category' | 'photo_paths'>; colors?: readonly [string, string]; iconSize?: number;
+}) {
   if (listing.photo_paths?.length) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={photoUrl(listing.photo_paths[0])} alt="" loading="lazy" />;
   }
-  return <Icon name={CATEGORY_ICON[listing.category]} size={iconSize} stroke={1.6} />;
+  return <ItemArt category={listing.category} colors={colors} size={iconSize} />;
 }
 
 export function ItemThumb({ item, size = 48, radius = 12 }: {
@@ -124,28 +145,39 @@ export function ItemThumb({ item, size = 48, radius = 12 }: {
 }) {
   const cat = item?.category ?? 'dorm';
   return (
-    <span className={CATEGORY_TINT[cat]} style={{ width: size, height: size, borderRadius: radius, overflow: 'hidden', flexShrink: 0,
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+    <span className={`tint-${artColorsFor(cat)[0]}`} style={{ width: size, height: size, borderRadius: radius, overflow: 'hidden', flexShrink: 0,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
       {item?.photo_paths?.length
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={photoUrl(item.photo_paths[0])} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <Icon name={CATEGORY_ICON[cat]} size={Math.round(size * 0.5)} stroke={1.6} />}
+        : <ItemArt category={cat} size={Math.round(size * 0.55)} corner={size >= 64} />}
     </span>
   );
 }
 
-export function ListingCard({ listing, mine }: { listing: Listing; mine?: boolean }) {
+// position = the card's spot in its grid, so no-photo cards alternate colors and neighbors never match
+export function ListingCard({ listing, mine, position = 0 }: { listing: Listing; mine?: boolean; position?: number }) {
+  const { ids, toggle } = useSaved();
+  const colors = artColors(position);
+  const photo = !!listing.photo_paths?.length;
+  const saved = ids.has(listing.id);
   return (
     <Link href={`/item/${listing.id}`} className="listing-card">
-      <div className={`img ${CATEGORY_TINT[listing.category]}`}>
-        <ItemImage listing={listing} />
+      <div className={`img ${photo ? '' : `tint-${colors[0]}`}`}>
+        <ItemImage listing={listing} colors={colors} />
         <span className="tier">{listing.tier}</span>
-        {mine && <span className="corner pill ink" style={{ fontSize: 11 }}>Yours</span>}
+        {mine
+          ? <span className="corner pill ink" style={{ fontSize: 11 }}>Yours</span>
+          : (
+            <button className={`card-heart${saved ? ' on' : ''}`} aria-label={saved ? 'Unsave item' : 'Save item'} aria-pressed={saved}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(listing.id); }}>
+              <Icon name="heart" size={15} fill={saved ? 'currentColor' : 'none'} stroke={2.2} />
+            </button>
+          )}
       </div>
       <div className="bd">
         <div className="t">{listing.title}</div>
-        {listing.wants && <div className="meta">Wants: {listing.wants}</div>}
-        <div className="meta-blue">✓ Verified</div>
+        {listing.wants && <div className="meta">For {listing.wants}</div>}
       </div>
     </Link>
   );

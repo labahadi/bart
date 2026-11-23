@@ -87,7 +87,7 @@ export default function Home() {
         {listings && listings.length === 0 && <div className="empty">Nothing here yet.</div>}
         {listings && listings.length > 0 && (
           <div className="grid2">
-            {listings.map((l) => <ListingCard key={l.id} listing={l} mine={l.owner_id === me?.id} />)}
+            {listings.map((l, i) => <ListingCard key={l.id} listing={l} mine={l.owner_id === me?.id} position={i} />)}
           </div>
         )}
       </main>

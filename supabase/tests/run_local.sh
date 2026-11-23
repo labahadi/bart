@@ -28,5 +28,6 @@ $P -d bart_test -f supabase/migrations/0020_blocking_and_push.sql
 $P -d bart_test -f supabase/migrations/0021_feed_photos.sql
 $P -d bart_test -f supabase/migrations/0022_trade_of_the_week_this_week.sql
 $P -d bart_test -f supabase/migrations/0023_trade_reviews.sql
+$P -d bart_test -f supabase/migrations/0024_more_categories.sql
 $P -d bart_test -f supabase/tests/grants_stub.sql
 $P -d bart_test -f supabase/tests/access_rules_test.sql

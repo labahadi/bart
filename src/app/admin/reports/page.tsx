@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase, photoUrl } from '@/lib/supabase';
-import { CATEGORY_ICON, CATEGORY_TINT, categoryLabel, friendlyError, type Category, type Tier } from '@/lib/trade';
+import { categoryLabel, friendlyError, type Category, type Tier } from '@/lib/trade';
 import { Icon } from '@/components/Icon';
-import { PushHeader } from '@/components/ui';
+import { ItemThumb, PushHeader } from '@/components/ui';
 
 type Row = {
   listing_id: string; title: string; description: string | null; wants: string | null;
@@ -89,12 +89,7 @@ export default function ReportQueue() {
 
             {/* The listing */}
             <div className="row" style={{ alignItems: 'flex-start' }}>
-              <div className={CATEGORY_TINT[r.category]} style={{ width: 72, height: 72, borderRadius: 12, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {r.photo_paths?.length
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={photoUrl(r.photo_paths[0])} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : <Icon name={CATEGORY_ICON[r.category]} size={30} stroke={1.6} />}
-              </div>
+              <ItemThumb item={r} size={72} radius={12} />
               <div className="grow">
                 <div style={{ fontSize: 16, fontWeight: 700 }}>{r.title}</div>
                 <div className="meta">{r.owner_name} · {categoryLabel(r.category)} · {r.tier}</div>
