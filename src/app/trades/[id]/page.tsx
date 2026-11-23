@@ -9,6 +9,7 @@ import { blockedAnywhere } from '@/lib/banned';
 import { OFFER_SELECT, displayName, friendlyError, offerGives, sides, turnOf, type Offer } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { TradeLockedIn } from '@/components/TradeLockedIn';
+import { MascotFace } from '@/components/Mascot';
 import { PastRecap } from '@/components/PastRecap';
 import { clash, freeTimes, type FreeTimes } from '@/lib/calendar';
 import { nyParts } from '@/lib/time';
@@ -319,6 +320,20 @@ export default function TradeChat() {
       </div>
 
       <main className="screen" style={{ paddingBottom: 100, gap: 12 }}>
+        {/* An accepted trade keeps the locked-in dog at the top until the swap happens */}
+        {offer.status === 'accepted' && !celebrate && (
+          <div className="mascot-banner locked-card">
+            <span className="blob" aria-hidden="true" />
+            <MascotFace face="trade-locked-in" width={92} alt="bart dog cheering" />
+            <span className="stack" style={{ gap: 3, minWidth: 0 }}>
+              <b style={{ fontSize: 19, letterSpacing: -0.4, lineHeight: 1.15 }}>Trade locked in!</b>
+              <span style={{ fontSize: 13, color: '#E4E9FF', lineHeight: 1.4 }}>
+                {offer.meet_confirmed_at ? `Meet ${meetShort} at ${place}.` : offer.meet_at ? `Meetup proposed: ${meetShort} at ${place}.` : `Next: pick a time and place to meet ${otherName}.`}
+              </span>
+            </span>
+          </div>
+        )}
+
         {/* A finished trade opens with a recap: outcome, items, ratings, Campus likes and comments */}
         {(offer.status === 'completed' || offer.status === 'declined' || offer.status === 'cancelled') && (
           <>

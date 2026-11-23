@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import type { Listing, Offer } from '@/lib/trade';
 import { Icon } from '@/components/Icon';
 import { ItemThumb } from '@/components/ui';
+import { MascotFace } from '@/components/Mascot';
 
 type Item = Pick<Listing, 'id' | 'title' | 'tier' | 'category' | 'photo_paths'> & { description?: string | null; condition?: string | null };
 type Reviews = { my_stars: number | null; their_stars: number | null; they_rated: boolean };
@@ -82,13 +83,25 @@ export function PastRecap({ offer, meId, otherName, place, onRate }: {
 
   return (
     <section className="recap" aria-label="Trade recap">
-      <div className={`recap-outcome ${swapped ? 'done' : 'off'}`}>
-        <span className="recap-outcome-icon"><Icon name={swapped ? 'check' : 'close'} size={16} stroke={2.6} /></span>
-        <span className="grow" style={{ minWidth: 0 }}>
-          <b>{outcome.label}</b>{outcome.when && ` · ${outcome.when}`}
-          {outcome.where && <span className="recap-where">{outcome.where}</span>}
-        </span>
-      </div>
+      {swapped ? (
+        // A finished swap keeps the dog: it pops in each time you open the trade
+        <div className="mascot-banner swapped-card">
+          <span className="blob" aria-hidden="true" />
+          <MascotFace face="trade-accepted" motion="pop-in" width={100} alt="bart dog celebrating" />
+          <span className="stack" style={{ gap: 3, minWidth: 0 }}>
+            <b style={{ fontSize: 22, letterSpacing: -0.5, lineHeight: 1.1 }}>Swapped!</b>
+            {outcome.when && <span style={{ fontSize: 14, fontWeight: 600 }}>{outcome.when}</span>}
+            {outcome.where && <span className="recap-where" style={{ color: '#E4E9FF' }}>{outcome.where}</span>}
+          </span>
+        </div>
+      ) : (
+        <div className="recap-outcome off">
+          <span className="recap-outcome-icon"><Icon name="close" size={16} stroke={2.6} /></span>
+          <span className="grow" style={{ minWidth: 0 }}>
+            <b>{outcome.label}</b>{outcome.when && ` · ${outcome.when}`}
+          </span>
+        </div>
+      )}
 
       <div className="recap-items">
         {gave.map((l) => itemCard(l, 'gave'))}

@@ -388,3 +388,8 @@ a.card:active, button.card:active, .segmented button:active { transform: scale(0
 /* Welcome */
 .welcome { min-height: 100dvh; background: var(--blue); color: #fff; display: flex; flex-direction: column; padding: 64px 28px calc(36px + env(safe-area-inset-bottom)); position: relative; overflow: hidden; }
 .welcome-blob { position: absolute; border-radius: 999px; pointer-events: none; }
+
+/* Trade chat: the dog stays on accepted and swapped trades */
+.swapped-card, .locked-card { padding: 12px 18px 12px 10px; gap: 12px; }
+.locked-card { background: var(--navy); }
+.locked-card .blob { background: var(--blue); }
