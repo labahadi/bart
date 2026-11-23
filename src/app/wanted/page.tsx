@@ -41,7 +41,7 @@ const readDismissed = (): string[] => { try { return JSON.parse(localStorage.get
 
 export default function Wanted() {
   const { me } = useAuth();
-  const { unread, markRead } = useNotifications();
+  const { markRead } = useNotifications();
   const [tab, setTab] = useState<'yours' | 'all'>('yours');
   const [isos, setIsos] = useRemembered<Iso[] | null>('wanted:isos', null);
   const [responses, setResponses] = useRemembered<IsoResponse[]>('wanted:responses', []);
@@ -65,11 +65,13 @@ export default function Wanted() {
     }
   }, []);
 
-  // Seeing Wanted clears the "someone has it" badges
-  const isoUnread = unread.filter((n) => n.kind === 'iso');
+  // Tapping a "someone has it" notification lands here as /wanted?iso=<id> and clears only that one
   useEffect(() => {
-    isoUnread.forEach((n) => { if (n.ref) markRead({ ref: n.ref }); });
-  }, [isoUnread.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    const iso = new URLSearchParams(window.location.search).get('iso');
+    if (!iso) return;
+    markRead({ ref: iso });
+    window.history.replaceState(null, '', '/wanted');
+  }, [markRead]);
 
   const load = useCallback(async () => {
     if (!me) return;

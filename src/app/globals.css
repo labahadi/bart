@@ -332,6 +332,7 @@ a.card:active, button.card:active, .segmented button:active { transform: scale(0
 .recap-outcome.off .recap-outcome-icon { background: var(--border); color: var(--muted); }
 .recap-where { display: block; font-size: 13px; margin-top: 2px; opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recap-items { display: flex; flex-direction: column; gap: 8px; }
+.recap-items:empty { display: none; }
 .recap-item { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border-radius: 18px; color: var(--ink); }
 .recap-item-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .recap-tag { font-size: 12px; font-weight: 700; color: var(--blue); }
@@ -365,31 +366,38 @@ a.card:active, button.card:active, .segmented button:active { transform: scale(0
 
 /* Mascot banners (Find loading, Activity) */
 .sniff-banner { display: flex; align-items: center; gap: 12px; background: var(--blue); color: #fff; border-radius: 24px; padding: 10px 16px 10px 10px; }
+/* Find: same size and spot as NoResultsCard's top row, so switching between them doesn't jump */
+.sniff-card { display: flex; align-items: center; gap: 12px; background: var(--blue); color: #fff; border-radius: 24px; padding: 10px 16px 6px 10px; }
+.sniff-card .bart-sniff, .sniff-reveal .bart-sniff { animation-delay: var(--sniff-delay, 0s); }
+/* "Couldn't sniff it out": the new words fade in and the buttons slide down into the card */
+.sniff-reveal b, .sniff-reveal b + span { animation: fade-in 0.3s ease both; }
+.sniff-reveal > div > div:last-child { animation: sniff-buttons 0.35s var(--ease) both; overflow: hidden; }
+@keyframes sniff-buttons { from { max-height: 0; margin-top: -14px; opacity: 0; transform: translateY(-6px); } to { max-height: 120px; margin-top: 0; opacity: 1; transform: none; } }
 .skeleton { background: #E6EAF8; border-radius: 8px; }
 .mascot-banner { display: flex; align-items: center; gap: 10px; background: var(--blue); color: #fff; border-radius: 28px; padding: 16px 16px 16px 8px;
   position: relative; overflow: hidden; border: none; text-align: left; width: 100%; }
 .mascot-banner > * { position: relative; }
 .mascot-banner .blob { position: absolute; right: -40px; bottom: -60px; width: 130px; height: 130px; border-radius: 999px; background: var(--pink); }
 
-/* Trade locked in! */
-.locked-in { position: fixed; inset: 0; z-index: 60; background: var(--navy); color: #fff; display: flex; flex-direction: column;
-  padding: 24px 24px calc(36px + env(safe-area-inset-bottom)); overflow: hidden auto; max-width: 430px; margin: 0 auto; animation: fade-in 0.2s ease both; }
-.locked-in .confetti { position: absolute; pointer-events: none; }
-.locked-close { align-self: flex-end; width: 44px; height: 44px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.12); color: #fff;
-  display: flex; align-items: center; justify-content: center; position: relative; }
-.locked-circle { width: 250px; height: 250px; border-radius: 999px; background: var(--blue); display: flex; align-items: center; justify-content: center; }
-.locked-title { position: relative; margin: 26px 0 0; font-size: 38px; font-weight: 800; letter-spacing: -1.4px; text-align: center; }
-.locked-sub { position: relative; margin: 8px 0 0; font-size: 16px; color: #DCE3FF; text-align: center; }
-.locked-swap { position: relative; margin-top: 26px; background: #fff; color: var(--ink); border-radius: 26px; padding: 14px;
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: center; gap: 8px; }
-.locked-swap-icon { grid-column: 2; grid-row: 1; justify-self: center; width: 44px; height: 44px; border-radius: 999px; background: var(--lime); color: var(--navy);
+/* Trade locked in! / Swapped!: the big dog card at the top of the trade */
+.dog-card { position: relative; overflow: hidden; background: var(--navy); color: #fff; border-radius: 30px; padding: 22px 18px 18px;
+  display: flex; flex-direction: column; align-items: center; gap: 0; }
+.dog-card .confetti { position: absolute; pointer-events: none; }
+.dog-card-circle { position: relative; width: 168px; height: 168px; border-radius: 999px; background: var(--blue); display: flex; align-items: center; justify-content: center; }
+.dog-card-title { position: relative; margin: 16px 0 0; font-size: 28px; font-weight: 800; letter-spacing: -1px; text-align: center; }
+.dog-card-sub { position: relative; margin: 6px 0 0; font-size: 14px; color: #DCE3FF; text-align: center; line-height: 1.4; }
+.dog-card-swap { position: relative; align-self: stretch; margin-top: 16px; background: #fff; color: var(--ink); border-radius: 22px; padding: 12px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr); align-items: center; gap: 8px; }
+.dog-card-item { display: flex; flex-direction: column; align-items: center; gap: 6px; color: inherit; text-decoration: none; min-width: 0; grid-row: 1; }
+.dog-card-swap-icon { grid-column: 2; grid-row: 1; width: 44px; height: 44px; border-radius: 999px; background: var(--lime);
   display: flex; align-items: center; justify-content: center; }
+.dog-card > .btn { align-self: stretch; margin-top: 12px; }
 
 /* Welcome */
 .welcome { min-height: 100dvh; background: var(--blue); color: #fff; display: flex; flex-direction: column; padding: 64px 28px calc(36px + env(safe-area-inset-bottom)); position: relative; overflow: hidden; }
 .welcome-blob { position: absolute; border-radius: 999px; pointer-events: none; }
 
-/* Trade chat: the dog stays on accepted and swapped trades */
-.swapped-card, .locked-card { padding: 12px 18px 12px 10px; gap: 12px; }
-.locked-card { background: var(--navy); }
-.locked-card .blob { background: var(--blue); }
+
+/* Opened from a notification: the post glows once so you can spot it */
+.card.flash { animation: post-flash 1.6s ease; }
+@keyframes post-flash { 0%, 40% { box-shadow: 0 0 0 3px var(--blue); } 100% { box-shadow: 0 0 0 3px transparent; } }

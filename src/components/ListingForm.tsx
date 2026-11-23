@@ -10,6 +10,7 @@ import { screenText } from '@/lib/screen';
 import { CATEGORIES, type Category, type Tier, friendlyError } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
+import { PostLiveDog } from '@/components/Mascot';
 
 const CONDITIONS = ['New', 'Like new', 'Good condition', 'Well loved'];
 const TIER_OPTIONS: [Tier, string][] = [['S', 'a coffee-ish'], ['M', 'a textbook-ish'], ['L', 'a fridge-ish']];
@@ -110,11 +111,9 @@ export function ListingForm({ editId }: { editId?: string }) {
   if (posted) {
     return (
       <main className="screen no-nav" style={{ alignItems: 'center', textAlign: 'center', paddingTop: 100 }}>
-        <span style={{ width: 88, height: 88, borderRadius: 999, background: 'var(--pink)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="check" size={40} stroke={2.4} />
-        </span>
+        <PostLiveDog />
         <h1 className="display" style={{ fontSize: 28 }}>It&apos;s live!</h1>
-        <p className="body">{posted}</p>
+        <p className="body">{posted} is posted. We&apos;ll fetch you some offers.</p>
         <Link href="/" className="btn">Back to feed</Link>
         <button className="text-btn" onClick={() => {
           setPosted(null); setTitle(''); setDescription(''); setWants(''); setPhotos([]); setCondition(null);

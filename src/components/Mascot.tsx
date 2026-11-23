@@ -91,3 +91,45 @@ export function TradeOfWeekDog() {
     </>
   );
 }
+
+/** "It's live!" post confirmation: heart-eyes dog with a pink check badge. Pops in once, then the badge bounces in. */
+export function PostLiveDog({ background = "#F7F8FF" }: { background?: string }) {
+  return (
+    <span className="bart-pop-in" style={{ position: "relative", display: "inline-block" }}>
+      <img src="/mascot/face-hot-offer.png" alt="bart dog with heart eyes" style={{ width: 166, height: "auto", display: "block" }} />
+      <span
+        className="bart-badge-in"
+        aria-hidden
+        style={{
+          position: "absolute", right: -6, bottom: 4, width: 52, height: 52, borderRadius: 999,
+          background: "#FF2E92", border: `4px solid ${background}`, boxSizing: "border-box",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24">
+          <path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="#FFFFFF" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    </span>
+  );
+}
+
+/** Find: no results. Same blue card as the loading state, sniffing dog, with the two actions inside the card. */
+export function NoResultsCard({ onPostWanted, onBrowse }: { onPostWanted?: () => void; onBrowse?: () => void }) {
+  const btn = { height: 52, border: 0, borderRadius: 999, fontFamily: "inherit", fontWeight: 800, fontSize: 16 } as const;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, background: "#3355FF", color: "#FFFFFF", borderRadius: 24, padding: "10px 16px 6px 10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <MascotFace face="sniffing" width={70} motion="sniff" alt="bart dog sniffing around" />
+        <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <b style={{ fontSize: 17 }}>Couldn&apos;t sniff it out</b>
+          <span style={{ fontSize: 13, color: "#E4E9FF" }}>Nothing matches yet.</span>
+        </span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingLeft: 6 }}>
+        <button type="button" onClick={onPostWanted} style={{ ...btn, background: "#D9FF3D", color: "#111116" }}>Post a Wanted</button>
+        <button type="button" onClick={onBrowse} style={{ ...btn, height: 48, fontSize: 15, fontWeight: 700, background: "transparent", color: "#FFFFFF" }}>Browse everything</button>
+      </div>
+    </div>
+  );
+}

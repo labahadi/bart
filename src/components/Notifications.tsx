@@ -12,7 +12,8 @@ type State = {
   unread: Notification[];
   counts: { trades: number; campus: number; me: number; all: number };
   unreadRefs: Set<string>;
-  markRead: (opts?: { tab?: Notification['tab']; ref?: string }) => Promise<void>;
+  // No options: clear everything. ref: every update about one trade/post. id: just that one update.
+  markRead: (opts?: { tab?: Notification['tab']; ref?: string; id?: string }) => Promise<void>;
 };
 
 const Ctx = createContext<State>({
@@ -40,10 +41,12 @@ export function NotificationsProvider({ userId, children }: { userId: string | n
     return () => { supabase.removeChannel(ch); };
   }, [userId, load]);
 
-  const markRead = useCallback(async (opts: { tab?: Notification['tab']; ref?: string } = {}) => {
-    const match = (n: Notification) => (!opts.tab || n.tab === opts.tab) && (!opts.ref || n.ref === opts.ref);
+  const markRead = useCallback(async (opts: { tab?: Notification['tab']; ref?: string; id?: string } = {}) => {
+    const match = (n: Notification) => (!opts.id || n.id === opts.id)
+      && (!opts.tab || n.tab === opts.tab) && (!opts.ref || n.ref === opts.ref);
     if (!unread.some(match)) return;
     setUnread((u) => u.filter((n) => !match(n)));
+    if (opts.id) { await supabase.rpc('mark_one_read', { p_id: opts.id }); return; }
     await supabase.rpc('mark_read', { p_tab: opts.tab ?? null, p_ref: opts.ref ?? null });
   }, [unread]);
 

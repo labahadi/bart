@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase';
 import type { Listing, Offer } from '@/lib/trade';
 import { Icon } from '@/components/Icon';
 import { ItemThumb } from '@/components/ui';
-import { MascotFace } from '@/components/Mascot';
+import { TradeDogCard } from '@/components/TradeDogCard';
 
 type Item = Pick<Listing, 'id' | 'title' | 'tier' | 'category' | 'photo_paths'> & { description?: string | null; condition?: string | null };
 type Reviews = { my_stars: number | null; their_stars: number | null; they_rated: boolean };
@@ -84,16 +84,8 @@ export function PastRecap({ offer, meId, otherName, place, onRate }: {
   return (
     <section className="recap" aria-label="Trade recap">
       {swapped ? (
-        // A finished swap keeps the dog: it pops in each time you open the trade
-        <div className="mascot-banner swapped-card">
-          <span className="blob" aria-hidden="true" />
-          <MascotFace face="trade-accepted" motion="pop-in" width={100} alt="bart dog celebrating" />
-          <span className="stack" style={{ gap: 3, minWidth: 0 }}>
-            <b style={{ fontSize: 22, letterSpacing: -0.5, lineHeight: 1.1 }}>Swapped!</b>
-            {outcome.when && <span style={{ fontSize: 14, fontWeight: 600 }}>{outcome.when}</span>}
-            {outcome.where && <span className="recap-where" style={{ color: '#E4E9FF' }}>{outcome.where}</span>}
-          </span>
-        </div>
+        // A finished swap keeps the big dog card: it pops in each time you open the trade
+        <TradeDogCard title="Swapped!" sub={[outcome.when, outcome.where].filter(Boolean).join(' · ')} give={gave[0]} get={got[0]} />
       ) : (
         <div className="recap-outcome off">
           <span className="recap-outcome-icon"><Icon name="close" size={16} stroke={2.6} /></span>
@@ -103,9 +95,10 @@ export function PastRecap({ offer, meId, otherName, place, onRate }: {
         </div>
       )}
 
+      {/* A swap already shows both items on the dog card; the cards below add any extra items */}
       <div className="recap-items">
-        {gave.map((l) => itemCard(l, 'gave'))}
-        {got.map((l) => itemCard(l, 'got'))}
+        {(swapped ? gave.slice(1) : gave).map((l) => itemCard(l, 'gave'))}
+        {(swapped ? got.slice(1) : got).map((l) => itemCard(l, 'got'))}
         {offer.sweeteners.length > 0 && (
           <span className="meta" style={{ paddingLeft: 4 }}>
             Plus {offer.sweeteners.map((s) => s.toLowerCase()).join(', ')}
@@ -129,7 +122,7 @@ export function PastRecap({ offer, meId, otherName, place, onRate }: {
       )}
 
       {post && (
-        <Link href="/campus" className="card recap-post">
+        <Link href={`/campus?post=${post.id}`} className="card recap-post">
           <span className="spread">
             <span className="recap-card-head">On Campus</span>
             <span className="row" style={{ gap: 12, fontSize: 14, fontWeight: 700 }}>

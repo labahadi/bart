@@ -7,7 +7,6 @@ import { classLabel, displayName, OFFER_SELECT, sides, type Listing, type Offer 
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Avatar, ItemThumb } from '@/components/ui';
-import { useNotifications } from '@/components/Notifications';
 
 // Your profile: opened from the card on Home. Account things (photo, name, Google Calendar,
 // sign out) are in Settings.
@@ -18,8 +17,6 @@ const STATUS: Record<Listing['status'], [string, string]> = {
 
 export default function Me() {
   const { me } = useAuth();
-  const { counts, markRead } = useNotifications();
-  useEffect(() => { if (counts.me) markRead({ tab: 'me' }); }, [counts.me, markRead]);
   const [tab, setTab] = useState<'closet' | 'saved' | 'trades'>('closet');
   const [closet, setCloset] = useState<Listing[]>([]);
   const [saved, setSaved] = useState<Listing[]>([]);
