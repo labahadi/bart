@@ -49,7 +49,7 @@ img { display: block; max-width: 100%; }
 /* App frame: phone width, centered on larger screens */
 .app { max-width: 430px; margin: 0 auto; min-height: 100dvh; background: var(--bg); position: relative; }
 .screen { padding: 16px 20px 116px; display: flex; flex-direction: column; gap: 16px; }
-.screen.no-nav { padding-bottom: 110px; }
+.screen.no-nav { padding-bottom: 130px; }
 .center-screen { min-height: 100dvh; display: flex; align-items: center; justify-content: center; color: var(--muted); }
 
 /* Type */
@@ -339,3 +339,23 @@ a.card:active, button.card:active, .segmented button:active { transform: scale(0
 .recap-card-head { font-size: 12px; font-weight: 700; color: var(--muted); }
 .recap-action { color: var(--blue); font-weight: 700; }
 .recap-divider { text-align: center; font-size: 12px; color: var(--muted); margin: 4px 0; }
+
+/* Items without a photo: category picture with a big circle in the top-right corner */
+:root { --blue-circle: #C9D3FF; --pink-circle: #FFC6E0; --green-circle: #E1F7A0; }
+.art-corner { position: absolute; height: 95%; aspect-ratio: 1; top: -38%; right: 0; transform: translateX(38%); border-radius: 999px; pointer-events: none; }
+.art-corner-blue { background: var(--blue-circle); }
+.art-corner-pink { background: var(--pink-circle); }
+.art-corner-green { background: var(--green-circle); }
+.listing-card .tier, .listing-card .corner { z-index: 1; }
+.card-heart { position: absolute; bottom: 10px; right: 10px; z-index: 1; width: 32px; height: 32px; border-radius: 999px; border: none; background: #fff;
+  color: var(--pink); display: flex; align-items: center; justify-content: center; padding: 0; transition: transform 0.14s var(--ease); }
+.card-heart:active { transform: scale(0.88); }
+.nav a:not(.on) { color: #8C92AB; }
+
+/* All categories */
+.category-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 10px; }
+.category-tile { color: var(--ink); display: block; transition: transform 0.14s var(--ease); }
+.category-tile:active { transform: scale(0.97); }
+.category-tile .img { height: 96px; border-radius: 24px; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.category-tile .t { font-size: 13px; font-weight: 700; margin-top: 6px; line-height: 1.2; }
+.category-tile .ex { font-size: 11px; color: var(--muted); line-height: 1.3; }

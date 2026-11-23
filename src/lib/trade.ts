@@ -1,26 +1,47 @@
 // Product rules shared across screens
 
 export type Tier = 'S' | 'M' | 'L' | 'Skill';
-export type Category = 'textbooks' | 'dorm' | 'clothes' | 'tickets' | 'skills' | 'misc';
+export type Category =
+  | 'textbooks' | 'tech' | 'dorm' | 'kitchen' | 'clothes' | 'accessories'
+  | 'tickets' | 'skills' | 'sports' | 'games' | 'beauty' | 'misc';
 
-export const CATEGORIES: { id: Category; label: string }[] = [
-  { id: 'textbooks', label: 'Textbooks' },
-  { id: 'dorm', label: 'Dorm supplies' },
-  { id: 'clothes', label: 'Clothes' },
-  { id: 'tickets', label: 'Tickets' },
-  { id: 'skills', label: 'Skills' },
-  { id: 'misc', label: 'Misc' },
+// The order here is the order everywhere: Find chips, the All categories screen, the post form.
+// Ids stay the same as before (textbooks, dorm, skills); only the labels changed.
+export const CATEGORIES: { id: Category; label: string; examples: string }[] = [
+  { id: 'textbooks', label: 'School supplies', examples: 'Textbooks, calculators' },
+  { id: 'tech', label: 'Tech', examples: 'Chargers, headphones' },
+  { id: 'dorm', label: 'Dorm & decor', examples: 'Lamps, posters, rugs' },
+  { id: 'kitchen', label: 'Kitchen', examples: 'Kettles, mugs, snacks' },
+  { id: 'clothes', label: 'Clothes', examples: 'Tops, jackets, formal' },
+  { id: 'accessories', label: 'Accessories', examples: 'Bags, jewelry, shoes' },
+  { id: 'tickets', label: 'Tickets', examples: 'Concerts, games' },
+  { id: 'skills', label: 'Skills & lessons', examples: 'Tutoring, haircuts' },
+  { id: 'sports', label: 'Sports & outdoors', examples: 'Gear, bikes, rackets' },
+  { id: 'games', label: 'Games & hobbies', examples: 'Consoles, crafts' },
+  { id: 'beauty', label: 'Beauty', examples: 'Unopened only' },
+  { id: 'misc', label: 'Misc', examples: 'Everything else' },
 ];
 
 export const categoryLabel = (c: Category) => CATEGORIES.find((x) => x.id === c)?.label ?? c;
 
+// Each category's picture, shown on the card when an item has no photo (see SoftIcon)
 export const CATEGORY_ICON = {
-  textbooks: 'book', dorm: 'lamp', clothes: 'shirt', tickets: 'ticket', skills: 'code', misc: 'box',
+  textbooks: 'backpack', tech: 'laptop', dorm: 'lamp', kitchen: 'mug', clothes: 'shirt', accessories: 'shades',
+  tickets: 'ticket', skills: 'bulb', sports: 'dumbbell', games: 'game', beauty: 'lipstick', misc: 'box',
 } as const;
 
-export const CATEGORY_TINT: Record<Category, string> = {
-  textbooks: 'tint-pink', dorm: 'tint-blue', clothes: 'tint-green', tickets: 'tint-blue', skills: 'tint-pink', misc: 'tint-green',
-};
+// Card colors for an item with no photo: [card tint, picture color]. The picture is never the
+// card's own color: pink on blue cards, blue on pink and lime cards. In a 2-column grid, going
+// by position makes the colors alternate like a checkerboard so neighbors never match.
+const ART_PATTERN = [['blue', 'pink'], ['pink', 'blue'], ['green', 'blue'], ['blue', 'pink']] as const;
+export const artColors = (position: number) => ART_PATTERN[((position % 4) + 4) % 4];
+// For a single item shown on its own (thumbnails, the item page), the category picks the colors
+export const artColorsFor = (c: Category) => artColors(CATEGORIES.findIndex((x) => x.id === c));
+
+// Older code paths still ask for a tint class per category
+export const CATEGORY_TINT: Record<Category, string> = Object.fromEntries(
+  CATEGORIES.map((c) => [c.id, `tint-${artColorsFor(c.id)[0]}`]),
+) as Record<Category, string>;
 
 // The 4 house rules everyone agrees to at sign-up (also shown in Settings)
 export const HOUSE_RULES: [string, string][] = [

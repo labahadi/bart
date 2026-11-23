@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase, photoUrl } from '@/lib/supabase';
-import { CATEGORY_ICON, CATEGORY_TINT, categoryLabel, displayName, friendlyError, type Listing, type Profile } from '@/lib/trade';
+import { artColorsFor, categoryLabel, displayName, friendlyError, type Listing, type Profile } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
-import { Avatar, Loading, ProfileLink } from '@/components/ui';
+import { Avatar, ItemArt, Loading, ProfileLink } from '@/components/ui';
 
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>();
@@ -66,7 +66,7 @@ export default function ItemDetail() {
   return (
     <>
       {/* Photo header */}
-      <div className={CATEGORY_TINT[item.category]} style={{ height: 280, position: 'relative' }}>
+      <div className={`tint-${artColorsFor(item.category)[0]}`} style={{ height: 280, position: 'relative', overflow: 'hidden' }}>
         {item.photo_paths.length > 0 ? (
           <div style={{ display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', height: '100%' }}>
             {item.photo_paths.map((p) => (
@@ -76,15 +76,15 @@ export default function ItemDetail() {
           </div>
         ) : (
           <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name={CATEGORY_ICON[item.category]} size={104} stroke={1.2} />
+            <ItemArt category={item.category} size={110} />
           </div>
         )}
         <div className="spread" style={{ position: 'absolute', top: 16, left: 20, right: 20 }}>
-          <button className="icon-btn plain" aria-label="Back" onClick={() => router.back()}><Icon name="back" size={20} stroke={2.2} /></button>
+          <button className="icon-btn" aria-label="Back" onClick={() => router.back()}><Icon name="back" size={20} stroke={2.2} /></button>
           {!mine && (
             <div className="row" style={{ gap: 8 }}>
-              <Link href={`/item/${item.id}/report`} className="icon-btn plain" aria-label="Report listing"><Icon name="flag" size={20} /></Link>
-              <button className="icon-btn plain" aria-label={saved ? 'Unsave item' : 'Save item'} onClick={toggleSave}
+              <Link href={`/item/${item.id}/report`} className="icon-btn" aria-label="Report listing"><Icon name="flag" size={20} /></Link>
+              <button className="icon-btn" aria-label={saved ? 'Unsave item' : 'Save item'} onClick={toggleSave}
                 style={{ color: 'var(--pink)' }}>
                 <Icon name="heart" size={20} fill={saved ? 'currentColor' : 'none'} />
               </button>

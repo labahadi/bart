@@ -17,6 +17,12 @@ export default function Find() {
   const [listings, setListings] = useState<Listing[] | null>(() => recall<Listing[]>('find:all') ?? null);
   const [error, setError] = useState('');
 
+  // Opened from All categories (/find?category=kitchen): start filtered to that category
+  useEffect(() => {
+    const c = new URLSearchParams(window.location.search).get('category');
+    if (c && CATEGORIES.some((x) => x.id === c)) setCategory(c as Category);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(async () => {
@@ -42,9 +48,12 @@ export default function Find() {
   return (
     <>
       <main className="screen">
-        <div>
-          <h1 className="title-tab">Find</h1>
-          <p className="subtitle">Search everything up for trade on campus</p>
+        <div className="spread" style={{ alignItems: 'flex-end' }}>
+          <div>
+            <h1 className="title-tab">Find</h1>
+            <p className="subtitle">Search everything up for trade on campus</p>
+          </div>
+          <Link href="/categories" style={{ fontSize: 14, fontWeight: 700, paddingBottom: 4, flexShrink: 0 }}>All categories</Link>
         </div>
 
         <label className="search" style={{ height: 50, borderColor: 'var(--blue)', borderWidth: 1.5 }}>
@@ -74,7 +83,7 @@ export default function Find() {
         {!listings && !error && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
         {listings && listings.length > 0 && (
           <div className="grid2">
-            {listings.map((l) => <ListingCard key={l.id} listing={l} mine={l.owner_id === me?.id} />)}
+            {listings.map((l, i) => <ListingCard key={l.id} listing={l} mine={l.owner_id === me?.id} position={i} />)}
           </div>
         )}
 

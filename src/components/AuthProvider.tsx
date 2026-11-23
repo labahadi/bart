@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { setExtraTerms } from '@/lib/banned';
 import { clearRemember, shouldForgetSession } from '@/lib/remember';
 import { forgetRemembered } from '@/lib/remembered';
+import { forgetSaved } from '@/lib/saves';
 import { BottomNav, Loading } from './ui';
 import { NotificationsProvider } from './Notifications';
 
@@ -63,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       // A different person (or nobody) is signed in now: drop what the tabs remembered
-      if (s?.user?.id !== lastUser.current) { forgetRemembered(); lastUser.current = s?.user?.id; }
+      if (s?.user?.id !== lastUser.current) { forgetRemembered(); forgetSaved(); lastUser.current = s?.user?.id; }
       setSession(s);
       // Defer the query so it doesn't run inside Supabase's auth callback
       setTimeout(() => loadProfile(s), 0);
