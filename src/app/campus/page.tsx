@@ -50,12 +50,13 @@ const SIDE_TINTS = [['tint-blue', 'tint-pink'], ['tint-green', 'tint-blue']] as 
 const asProfile = (p: Post): Profile => ({ id: p.author_id, first_name: p.author_first, last_initial: p.author_initial, avatar_path: p.author_avatar });
 
 export default function Campus() {
-  // Opening Campus clears its badge (answers to "Looking for" posts are cleared on Wanted instead)
-  const { unread, markRead } = useNotifications();
-  const feedUnread = unread.filter((n) => n.tab === 'campus' && n.kind !== 'iso');
+  // Notifications stay until you tap them in Activity (or Clear all there).
+  // A tap lands here as /campus?post=<id>, which clears only that post's updates.
+  const { markRead } = useNotifications();
   useEffect(() => {
-    feedUnread.forEach((n) => markRead(n.ref ? { ref: n.ref } : { tab: 'campus' }));
-  }, [feedUnread.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    const post = new URLSearchParams(window.location.search).get('post');
+    if (post) markRead({ ref: post });
+  }, [markRead]);
   return (
     <>
       <main className="screen">
@@ -77,6 +78,22 @@ function Feed() {
   const [featured, setFeatured] = useRemembered<Featured | null>('campus:featured', null);
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState('');
+  // Opened from a notification: jump to that post (and its comments, for a comment)
+  const [target, setTarget] = useState<{ post: string; comments: boolean } | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const post = q.get('post');
+    if (post) setTarget({ post, comments: q.get('comments') === '1' });
+    if (post) window.history.replaceState(null, '', '/campus');
+  }, []);
+  useEffect(() => {
+    if (!target || !posts?.some((p) => p.id === target.post)) return;
+    if (target.comments) setOpen(target.post);
+    const el = document.getElementById(`post-${target.post}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el?.classList.add('flash');
+    setTarget(null);
+  }, [target, posts]);
 
   const load = useCallback(async () => {
     const [{ data, error }, { data: top }] = await Promise.all([
@@ -167,7 +184,7 @@ function Feed() {
       {posts.length === 0 && <div className="empty">No trades shared yet.</div>}
 
       {posts.map((p, i) => (
-        <div key={p.id} className="card stack" style={{ gap: 12 }}>
+        <div key={p.id} id={`post-${p.id}`} className="card stack" style={{ gap: 12 }}>
           <div className="row" style={{ gap: 10 }}>
             <ProfileLink id={p.author_id}><Avatar profile={asProfile(p)} size={36} /></ProfileLink>
             <div className="grow" style={{ fontSize: 14 }}>

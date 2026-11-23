@@ -56,10 +56,17 @@ export default function Activity() {
       .then(({ data }) => setItems((data ?? []) as Notification[]));
   }, [unread.length]);
 
+  // Where a tap goes: the trade, the exact post (comments open for a comment), the Wanted post
+  function linkFor(n: Notification) {
+    if (n.kind === 'iso') return n.ref ? `/wanted?iso=${n.ref}` : '/wanted';
+    if (n.tab === 'campus' && n.ref) return `/campus?post=${n.ref}${n.kind === 'comment' ? '&comments=1' : ''}`;
+    return n.link;
+  }
+
+  // Tapping clears only this update (and others about the same trade or post), never the rest
   async function open(n: Notification) {
-    if (!n.read_at) await markRead({ ref: n.ref ?? undefined, tab: n.ref ? undefined : n.tab });
-    // Answers to "Looking for" posts were stored with a link to the old ISO board on Campus
-    router.push(n.kind === 'iso' ? '/wanted' : n.link);
+    if (unread.some((u) => u.id === n.id)) await markRead(n.ref ? { ref: n.ref } : { id: n.id });
+    router.push(linkFor(n));
   }
 
   const shown = items?.filter((n) => tab === 'all' || n.tab === tab);
@@ -71,7 +78,7 @@ export default function Activity() {
     <main className="screen no-nav">
       <div className="spread">
         <button className="icon-btn" aria-label="Back" onClick={() => router.push('/')}><Icon name="back" size={20} stroke={2.2} /></button>
-        {unread.length > 0 && <button className="text-btn" onClick={() => markRead()}>Mark all read</button>}
+        {unread.length > 0 && <button className="text-btn" onClick={() => markRead()}>Clear all</button>}
       </div>
       <h1 className="title-tab">Activity</h1>
 
