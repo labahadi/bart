@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { OFFER_SELECT, friendlyError, turnOf, type Listing, type Offer } from '@/lib/trade';
@@ -8,6 +9,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Loading, PushHeader } from '@/components/ui';
 import { Fairness } from '@/components/FairnessAI';
+import { addToClosetHref, takeReturnedPicks } from '@/lib/returnTo';
 
 // Counter an offer: change which of the sender's items (and sweeteners) the trade is for.
 // Works for both sides: the owner asks for something different, or the sender revises.
@@ -27,7 +29,8 @@ export default function Counter() {
       const o = data as unknown as Offer;
       if (!o) return;
       setOffer(o);
-      setPicked(o.items.map((i) => i.listing?.id).filter(Boolean) as string[]);
+      // Back from adding something to the closet: keep the picks from before and add the new item
+      setPicked(takeReturnedPicks() ?? (o.items.map((i) => i.listing?.id).filter(Boolean) as string[]));
       // The sender's closet: their active items, plus whatever is already in this offer
       const { data: items } = await supabase.from('listings').select('*')
         .eq('owner_id', o.from_user).eq('status', 'active').order('created_at', { ascending: false });
@@ -63,7 +66,7 @@ export default function Counter() {
 
         <div>
           <p className="label">{iAmOwner ? `From ${sender?.first_name ?? 'their'}'s closet` : 'You give'}</p>
-          {closet.length === 0 ? (
+          {closet.length === 0 && !(myTurn && !iAmOwner) ? (
             <p className="body">Nothing else listed.</p>
           ) : (
             <div className="stack" style={{ gap: 10 }}>
@@ -78,6 +81,13 @@ export default function Counter() {
                   </button>
                 );
               })}
+              {/* The sender can add something new mid-trade and come right back */}
+              {myTurn && !iAmOwner && (
+              <Link href={addToClosetHref(`/trades/${id}/counter`, picked)} className="check-row add-row">
+                <span className="add-plus"><Icon name="plus" size={16} stroke={2.8} /></span>
+                <span className="row-title grow">Add something to your closet</span>
+              </Link>
+              )}
             </div>
           )}
         </div>

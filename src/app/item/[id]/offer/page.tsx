@@ -9,6 +9,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Loading, PushHeader } from '@/components/ui';
 import { Fairness } from '@/components/FairnessAI';
+import { addToClosetHref, takeReturnedPicks } from '@/lib/returnTo';
 
 export default function BuildOffer() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +34,9 @@ export default function BuildOffer() {
       ]);
       setOwner(p as Profile);
       setCloset((mineData ?? []) as Listing[]);
+      // Back from adding something to the closet: keep earlier picks and pick the new item
+      const returned = takeReturnedPicks();
+      if (returned) setPicked(returned);
     })();
   }, [id, me]);
 
@@ -63,8 +67,8 @@ export default function BuildOffer() {
           <p className="label">You give</p>
           {closet.length === 0 ? (
             <div className="card stack" style={{ gap: 10 }}>
-              <p className="body">List something first.</p>
-              <Link href="/post" className="btn pink small">Post an item</Link>
+              <p className="body">Your closet is empty. Add something and you&apos;ll come right back here.</p>
+              <Link href={addToClosetHref(`/item/${id}/offer`, [])} className="btn pink small">Add to your closet</Link>
             </div>
           ) : (
             <div className="stack" style={{ gap: 10 }}>
@@ -79,6 +83,10 @@ export default function BuildOffer() {
                   </button>
                 );
               })}
+              <Link href={addToClosetHref(`/item/${id}/offer`, picked)} className="check-row add-row">
+                <span className="add-plus"><Icon name="plus" size={16} stroke={2.8} /></span>
+                <span className="row-title grow">Add something to your closet</span>
+              </Link>
             </div>
           )}
         </div>

@@ -11,6 +11,7 @@ import { CATEGORIES, type Category, type Tier, friendlyError } from '@/lib/trade
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { PostLiveDog } from '@/components/Mascot';
+import { safeBack, withParam } from '@/lib/returnTo';
 
 const CONDITIONS = ['New', 'Like new', 'Good condition', 'Well loved'];
 const TIER_OPTIONS: [Tier, string][] = [['S', 'a coffee-ish'], ['M', 'a textbook-ish'], ['L', 'a fridge-ish']];
@@ -33,6 +34,9 @@ export function ListingForm({ editId }: { editId?: string }) {
   const [posted, setPosted] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!editId);
   const [locked, setLocked] = useState(false);
+  // Opened from a trade (/post?back=...): posting goes straight back to it with the new item picked
+  const [back, setBack] = useState<string | null>(null);
+  useEffect(() => { setBack(safeBack(new URLSearchParams(window.location.search).get('back'))); }, []);
 
   // New listing from the ISO board: start with the wanted item's name
   useEffect(() => {
@@ -87,12 +91,13 @@ export function ListingForm({ editId }: { editId?: string }) {
     };
     const problem = await screenText(fields.title, fields.description, fields.wants);
     if (problem) { setBusy(false); setError(problem); return; }
-    const { error } = editId
-      ? await supabase.from('listings').update(fields).eq('id', editId)
-      : await supabase.from('listings').insert(fields);
+    const { data: saved, error } = editId
+      ? await supabase.from('listings').update(fields).eq('id', editId).select('id').single()
+      : await supabase.from('listings').insert(fields).select('id').single();
     setBusy(false);
     if (error) setError(friendlyError(error));
     else if (editId) router.replace(`/item/${editId}`);
+    else if (back && saved) router.replace(withParam(back, 'added', saved.id));
     else setPosted(title.trim());
   }
 
@@ -127,10 +132,13 @@ export function ListingForm({ editId }: { editId?: string }) {
     <>
       <main className="screen no-nav">
         <div className="spread">
-          <button className="icon-btn" aria-label="Close" onClick={() => router.push(editId ? `/item/${editId}` : '/')}><Icon name="close" size={20} /></button>
+          <button className="icon-btn" aria-label="Close" onClick={() => router.push(editId ? `/item/${editId}` : back ?? '/')}><Icon name="close" size={20} /></button>
           <h1 className="display" style={{ fontSize: 20 }}>{editId ? 'Edit listing' : 'Add to your closet'}</h1>
           <span style={{ width: 44 }} />
         </div>
+        {back && !editId && (
+          <p className="meta" style={{ textAlign: 'center', marginTop: -8 }}>Once it&apos;s posted, you&apos;ll go right back to your trade.</p>
+        )}
 
         <div className="segmented">
           <button className={!isSkill ? 'on' : ''} onClick={() => isSkill && setCategory('dorm')}>An item</button>

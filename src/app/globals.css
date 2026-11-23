@@ -408,3 +408,8 @@ a.card:active, button.card:active, .segmented button:active { transform: scale(0
 .expand > div { overflow: hidden; min-height: 0; }
 .comment-in { animation: fade-in 0.25s ease both; }
 @media (prefers-reduced-motion: reduce) { .expand { transition: none; } .comment-in { animation: none; } }
+
+/* Propose / counter: add something new to your closet without leaving the trade */
+.check-row.add-row { box-shadow: none; background: transparent; border: 2px dashed var(--dashed); color: var(--blue); text-decoration: none; }
+.check-row.add-row .row-title { color: var(--blue); }
+.add-plus { width: 24px; height: 24px; border-radius: 999px; background: var(--blue); color: #fff; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
