@@ -8,6 +8,7 @@ import { screenText } from '@/lib/screen';
 import { friendlyError, type Profile } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
+import { TradeOfWeekDog } from '@/components/Mascot';
 import { Avatar, ProfileLink } from '@/components/ui';
 import { useNotifications } from '@/components/Notifications';
 
@@ -114,28 +115,28 @@ function Feed() {
     <>
       {!top && (
         <div className="totw">
-          <span className="totw-dot" aria-hidden="true" />
+          <TradeOfWeekDog />
           <div className="spread">
             <span className="row" style={{ gap: 6, fontSize: 13, fontWeight: 800, letterSpacing: 0.4 }}>
               <Icon name="trophy" size={17} /> TRADE OF THE WEEK
             </span>
-            <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.9, paddingRight: 36 }}>{weekRange(mondayOf(new Date()))}</span>
           </div>
           <div className="totw-title">No trade this week. <b>Trade something and vote!</b></div>
+          <span className="totw-week">{weekRange(mondayOf(new Date()))}</span>
         </div>
       )}
       {top && (
         <div className="totw">
-          <span className="totw-dot" aria-hidden="true" />
+          <TradeOfWeekDog />
           <div className="spread">
             <span className="row" style={{ gap: 6, fontSize: 13, fontWeight: 800, letterSpacing: 0.4 }}>
               <Icon name="trophy" size={17} /> TRADE OF THE WEEK
             </span>
-            <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.9, paddingRight: 36 }}>{weekRange(featured!.week_start)}</span>
           </div>
           <div className="totw-title">
             <b>{top.gave}</b> for <b>{top.got}</b>
           </div>
+          <span className="totw-week">{weekRange(featured!.week_start)}</span>
           <div className="spread">
             <ProfileLink id={top.author_id} style={{ color: '#fff' }}>
               <span className="row" style={{ gap: 8 }}>

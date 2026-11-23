@@ -8,12 +8,12 @@ import { Badge, useNotifications } from './Notifications';
 import { photoUrl } from '@/lib/supabase';
 import { CATEGORY_ICON, artColors, artColorsFor, type Category, type Listing, type Profile, initial } from '@/lib/trade';
 import { SoftIcon, type SoftIconName } from './SoftIcon';
+import { BartLogo } from './Mascot';
 import { useSaved } from '@/lib/saves';
 
-// The brand-kit logo (horizontal, color). Drawn as shapes, so no font is needed.
+// The logo: logo face + "bart" wordmark (from the mascot handoff)
 export function Logo({ height = 30 }: { height?: number }) {
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/brand/bart-logo-horizontal-color.svg" alt="bart" style={{ height, width: 'auto' }} />;
+  return <BartLogo size={Math.round(height * 0.95)} />;
 }
 
 // Home, Find, Wanted, Campus, Chats. Your profile and "Add to your closet" live on Home now.

@@ -8,6 +8,7 @@ import { blockedAnywhere } from '@/lib/banned';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Logo } from '@/components/ui';
+import { WaggingDog } from '@/components/Mascot';
 import { rememberSignIn } from '@/lib/remember';
 
 // Penn addresses, including school subdomains like wharton.upenn.edu
@@ -28,7 +29,8 @@ const RULES = HOUSE_RULES;
 export default function SignUp() {
   const { session, me, refresh } = useAuth();
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  // 0 = Welcome (the wagging dog), then email → code → name + house rules
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [email, setEmail] = useState('');
   const [touched, setTouched] = useState(false);
   const [code, setCode] = useState('');
@@ -52,6 +54,7 @@ export default function SignUp() {
     const params = new URLSearchParams(window.location.hash.slice(1) || window.location.search.slice(1));
     const code = params.get('error_code');
     if (!code && !params.get('error')) return;
+    setStep(1);
     setError(code === 'otp_expired'
       ? "That sign-in link already expired or was used. Penn's email scanner sometimes opens links before you do. Send a new one, or use the 6-digit code if your email has one."
       : `Sign-in link didn't work: ${params.get('error_description')?.replace(/\+/g, ' ') ?? code}`);
@@ -103,6 +106,32 @@ export default function SignUp() {
 
   const allAgreed = agreed.every(Boolean);
   const nameOk = first.trim().length >= 1 && !/\s/.test(first.trim()) && /^[a-z]$/i.test(lastInitial.trim()) && !blockedAnywhere(first);
+
+  if (step === 0) {
+    return (
+      <main className="welcome">
+        <span className="welcome-blob" style={{ width: 300, height: 300, background: 'var(--pink)', top: -130, right: -120 }} />
+        <span className="welcome-blob" style={{ width: 56, height: 56, background: 'var(--lime)', top: 120, left: 30 }} />
+        <span className="welcome-blob" style={{ width: 330, height: 330, background: '#2A47E6', top: 96, left: 30 }} />
+        <div style={{ position: 'relative', height: 330, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <WaggingDog height={300} />
+        </div>
+        <div className="stack" style={{ position: 'relative', gap: 16, marginTop: 40 }}>
+          <h1 style={{ margin: 0, fontSize: 60, fontWeight: 800, letterSpacing: -2.5, lineHeight: 1 }}>bart</h1>
+          <p style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: -0.5, lineHeight: 1.2 }}>You&apos;re broke.<br />So is everyone else.</p>
+          <p style={{ margin: 0, fontSize: 16, fontWeight: 500, lineHeight: 1.5, color: '#E4E9FF', maxWidth: 300 }}>
+            Trade your stuff with people on campus. No money needed.
+          </p>
+        </div>
+        <div className="stack" style={{ position: 'relative', marginTop: 'auto', paddingTop: 28, gap: 6 }}>
+          <button className="btn lime" style={{ height: 56, fontSize: 17 }} onClick={() => setStep(1)}>Sign up with your Penn email</button>
+          <button className="btn" style={{ background: 'transparent', color: '#fff', height: 48, fontSize: 15 }} onClick={() => setStep(1)}>
+            I already have an account
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main style={{ padding: '40px 24px 40px', display: 'flex', flexDirection: 'column', gap: 16, minHeight: '100dvh' }}>

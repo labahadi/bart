@@ -8,6 +8,7 @@ import { CATEGORIES, type Category, type Listing } from '@/lib/trade';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { ListingCard } from '@/components/ui';
+import { MascotFace, SniffingDots } from '@/components/Mascot';
 
 // Find: search everything that's up for trade (this used to be the search on Home)
 export default function Find() {
@@ -80,7 +81,27 @@ export default function Find() {
         )}
 
         {error && <div className="alert">{error}</div>}
-        {!listings && !error && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
+        {/* Loading: the dog sniffs around while the cards load */}
+        {!listings && !error && (
+          <>
+            <div className="sniff-banner" role="status">
+              <MascotFace face="sniffing" motion="sniff" width={74} alt="bart dog sniffing around" />
+              <span className="stack" style={{ gap: 3 }}>
+                <b style={{ fontSize: 17 }}><SniffingDots label="Sniffing around campus" /></b>
+                <span style={{ fontSize: 13, color: '#E4E9FF' }}>Checking closets near you</span>
+              </span>
+            </div>
+            <div className="grid2" aria-hidden="true">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i}>
+                  <div className="skeleton" style={{ height: 132, borderRadius: 26 }} />
+                  <div className="skeleton" style={{ height: 14, width: `${70 - i * 5}%`, marginTop: 10 }} />
+                  <div className="skeleton" style={{ height: 12, width: '45%', marginTop: 8, opacity: 0.7 }} />
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         {listings && listings.length > 0 && (
           <div className="grid2">
             {listings.map((l, i) => <ListingCard key={l.id} listing={l} mine={l.owner_id === me?.id} position={i} />)}

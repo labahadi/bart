@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Icon, type IconName } from '@/components/Icon';
 import { useNotifications, type Notification } from '@/components/Notifications';
+import { MascotFace } from '@/components/Mascot';
 
 // One look per kind of update: icon, tint, and the button shown while it's new
 const KIND: Record<string, { icon: IconName; tint: string; action?: string }> = {
@@ -62,6 +63,9 @@ export default function Activity() {
   }
 
   const shown = items?.filter((n) => tab === 'all' || n.tab === tab);
+  // Unread offers and counters, for the banner. With one, name the item ("...for your mini fridge").
+  const newOffers = unread.filter((n) => n.kind === 'offer' || n.kind === 'counter');
+  const offerItem = newOffers.length === 1 ? newOffers[0].body.match(/for your (.+?)\.?$/)?.[1] : undefined;
 
   return (
     <main className="screen no-nav">
@@ -70,6 +74,22 @@ export default function Activity() {
         {unread.length > 0 && <button className="text-btn" onClick={() => markRead()}>Mark all read</button>}
       </div>
       <h1 className="title-tab">Activity</h1>
+
+      {/* New offers: the dog perks up */}
+      {newOffers.length > 0 && (
+        <button className="mascot-banner" onClick={() => setTab('trades')}>
+          <span className="blob" aria-hidden="true" />
+          <MascotFace face="new-alert" width={104} alt="bart dog surprised" />
+          <span className="stack" style={{ gap: 4 }}>
+            <b style={{ fontSize: 20, letterSpacing: -0.4, lineHeight: 1.2 }}>
+              {newOffers.length} new offer{newOffers.length === 1 ? '' : 's'}!
+            </b>
+            <span style={{ fontSize: 14, color: '#E4E9FF', lineHeight: 1.4 }}>
+              {offerItem ? `Someone wants your ${offerItem}.` : 'People want your stuff.'} Check before it&apos;s gone.
+            </span>
+          </span>
+        </button>
+      )}
 
       <div className="segmented">
         {TABS.map((t) => (
