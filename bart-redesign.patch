@@ -1,0 +1,1473 @@
+From ddf38cdf600d2936e7050eb5912fabe9a68f1855 Mon Sep 17 00:00:00 2001
+From: Naishu Vytla <naishuvy@gmail.com>
+Date: Wed, 11 Nov 2026 00:15:32 -0500
+Subject: [PATCH] Redesign: profile card on Home, Find + Wanted tabs, Settings
+
+- Home: profile card (photo, name, rating, trades, closet count) that opens
+  your profile, plus an "Add to your closet" button. The + leaves the nav.
+- Bottom nav: Home, Find, Wanted, Campus, Chats. Me leaves the nav.
+- Find (/find): the search and category chips that used to be on Home,
+  with an "Ask" shortcut when nothing matches.
+- Wanted (/wanted): replaces the ISO board on Campus. "Wants your stuff"
+  shows requests something in your closet could answer; "All requests" is
+  the searchable list with "I have it". Same iso_posts / iso_responses tables.
+- Profile (/me): Closet, Saved and Trades tabs; Edit profile opens Settings.
+- Settings (/settings): profile photo, name, Google Calendar, house rules,
+  review reports, sign out.
+- Profile photos: migration 0017 adds profiles.avatar_path; uploads go
+  through /api/photo (kind = avatar) and the same AI photo check.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01FHEDyoecMybhL2pQpguM63
+---
+ README.md                                   |   8 +-
+ src/app/activity/page.tsx                   |   3 +-
+ src/app/admin/reports/page.tsx              |   2 +-
+ src/app/api/photo/route.ts                  |  21 +-
+ src/app/campus/page.tsx                     | 147 +----------
+ src/app/find/page.tsx                       |  88 +++++++
+ src/app/login/page.tsx                      |   9 +-
+ src/app/me/page.tsx                         | 179 ++++++-------
+ src/app/page.tsx                            |  99 +++----
+ src/app/settings/page.tsx                   | 182 +++++++++++++
+ src/app/wanted/page.tsx                     | 271 ++++++++++++++++++++
+ src/components/AuthProvider.tsx             |   6 +-
+ src/components/Icon.tsx                     |   4 +
+ src/components/ui.tsx                       |  26 +-
+ src/lib/photos.ts                           |   8 +
+ src/lib/trade.ts                            |   8 +
+ supabase/migrations/0017_profile_photos.sql |  27 ++
+ 17 files changed, 790 insertions(+), 298 deletions(-)
+ create mode 100644 src/app/find/page.tsx
+ create mode 100644 src/app/settings/page.tsx
+ create mode 100644 src/app/wanted/page.tsx
+ create mode 100644 supabase/migrations/0017_profile_photos.sql
+
+diff --git a/README.md b/README.md
+index 6037726..0a72c78 100644
+--- a/README.md
++++ b/README.md
+@@ -55,7 +55,10 @@ Every push to `main` redeploys automatically.
+ ```
+ src/app/                 one folder per screen
+   login/                 sign-up: Penn email → 6-digit code → name + 4 house rules
+-  page.tsx               home feed: search, category chips, listing grid
++  page.tsx               home: your profile card (opens your profile), Add to your closet, fresh listings
++  find/                  search everything up for trade, category chips
++  wanted/                "Looking for" requests: ones your closet can answer, and all requests (was the ISO board)
++  settings/              profile photo, name, Google Calendar, house rules, review reports, sign out
+   post/                  new listing: photos, banned-word check, category, tier, wants
+   item/[id]/             item detail, save (heart), report flag
+   item/[id]/offer/       build an offer: pick from your closet, sweeteners, fairness meter, Safe Spot
+@@ -63,7 +66,7 @@ src/app/                 one folder per screen
+   trades/                inbox: Incoming / Sent / Done, accept / decline / cancel
+   trades/[id]/           live chat, meetup card, mark complete, 5-star rating
+   trades/[id]/meetup/    pick day, daytime slot and Safe Spot
+-  me/                    profile, stats, my closet, saved items, sign out
++  me/                    your profile: stats, closet, saved, finished trades
+ src/components/          shared pieces (nav, cards, icons, sign-in gate)
+ src/lib/trade.ts         product rules: tiers, fairness meter, sweeteners
+ src/lib/banned.ts        banned-word list (as-you-type check)
+@@ -118,6 +121,7 @@ Run each of these once in the Supabase **SQL Editor**, in order, after 0001–00
+ | `0014_earlier_start.sql` | Meetups can start as early as **7:30 AM** (latest is still 8:00 PM). |
+ | `0015_confirm_and_calendar.sql` | **One person proposes a meetup, the other confirms** (or suggests another time). Changing a confirmed meetup makes it a new proposal. Adds the optional **Google Calendar link** (only busy/free times, never event details) and **Share with a friend** links: a page anyone can open showing the time, place and map, plus what bart is. The page stops working a day after the meetup. |
+ | `0016_word_filter.sql` | Blocks **swearing, slurs and threats everywhere**, chat included. Reviewers can **add their own blocked words** (Review reports → Words), which work right away. First names must be one word. |
++| `0017_profile_photos.sql` | **Profile photos.** Adds an optional photo to each profile (Settings → Profile photo). Photos go through the same AI photo check as listings. Safe to run before the redesign is merged: it only adds a column. |
+ 
+ Then run `npm install` again (the QR code feature added a package).
+ 
+diff --git a/src/app/activity/page.tsx b/src/app/activity/page.tsx
+index d736c93..aac079d 100644
+--- a/src/app/activity/page.tsx
++++ b/src/app/activity/page.tsx
+@@ -31,7 +31,8 @@ export default function Activity() {
+ 
+   async function open(n: Notification) {
+     if (!n.read_at) await markRead({ ref: n.ref ?? undefined, tab: n.ref ? undefined : n.tab });
+-    router.push(n.link);
++    // Answers to "Looking for" posts were stored with a link to the old ISO board on Campus
++    router.push(n.kind === 'iso' ? '/wanted' : n.link);
+   }
+ 
+   return (
+diff --git a/src/app/admin/reports/page.tsx b/src/app/admin/reports/page.tsx
+index c089fcf..00aa82f 100644
+--- a/src/app/admin/reports/page.tsx
++++ b/src/app/admin/reports/page.tsx
+@@ -52,7 +52,7 @@ export default function ReportQueue() {
+ 
+   return (
+     <main className="screen no-nav">
+-      <PushHeader title="Reports" back="/me" />
++      <PushHeader title="Reports" back="/settings" />
+ 
+       <div className="segmented">
+         <button className={tab === 'open' ? 'on' : ''} onClick={() => setTab('open')}>
+diff --git a/src/app/api/photo/route.ts b/src/app/api/photo/route.ts
+index d509c31..eb9d9b1 100644
+--- a/src/app/api/photo/route.ts
++++ b/src/app/api/photo/route.ts
+@@ -15,6 +15,7 @@ Block a photo only for these reasons:
+ - "violence": graphic violence or gore.
+ - "hate": hate symbols.
+ - LISTING photos only, "banned_item": the main subject is drugs or drug gear, a vape, alcohol, a weapon, a fake ID, or an exam/answer key.
++PROFILE photos are usually a selfie or a picture of the person; that is fine. For profile photos use only "sexual", "violence" and "hate".
+ Everything else is allowed, including: messy rooms, a bottle or can that is not the item being traded, kitchen knives in the background, posters, clothing laid out or worn normally, fully clothed people, screenshots, blurry or dark photos. For violence, hate and banned items, block only when it is clearly there.
+ Reply with JSON only: {"allowed": true | false, "category": "none" | "sexual" | "violence" | "hate" | "banned_item", "what": "<3-6 words naming what you saw, only if blocked>"}`;
+ 
+@@ -43,7 +44,8 @@ export async function POST(req: Request) {
+ 
+   const form = await req.formData().catch(() => null);
+   const file = form?.get('file');
+-  const kind = form?.get('kind') === 'chat' ? 'chat' : 'listing';
++  const rawKind = form?.get('kind');
++  const kind: 'chat' | 'avatar' | 'listing' = rawKind === 'chat' ? 'chat' : rawKind === 'avatar' ? 'avatar' : 'listing';
+   const offerId = String(form?.get('offerId') ?? '');
+   if (!(file instanceof Blob)) return NextResponse.json({ error: 'No photo.' }, { status: 400 });
+   if (file.size > 5 * 1024 * 1024) return NextResponse.json({ error: 'That photo is too big.' }, { status: 413 });
+@@ -68,7 +70,7 @@ export async function POST(req: Request) {
+         model: MODEL, max_tokens: 1024, system: RULES,
+         messages: [{ role: 'user', content: [
+           { type: 'image', source: { type: 'base64', media_type: file.type, data: bytes.toString('base64') } },
+-          { type: 'text', text: `This is a ${kind === 'chat' ? 'CHAT' : 'LISTING'} photo. Is it allowed?` },
++          { type: 'text', text: `This is a ${kind === 'chat' ? 'CHAT' : kind === 'avatar' ? 'PROFILE' : 'LISTING'} photo. Is it allowed?` },
+         ] }],
+       }),
+     }).catch(() => null);
+@@ -104,12 +106,25 @@ export async function POST(req: Request) {
+ 
+   // Allowed: store it
+   const bucket = kind === 'chat' ? 'chat-photos' : 'listing-photos';
+-  const path = `${kind === 'chat' ? offerId : userId}/${newId()}.jpg`;
++  const path = kind === 'chat' ? `${offerId}/${newId()}.jpg` : kind === 'avatar' ? `${userId}/avatar-${newId()}.jpg` : `${userId}/${newId()}.jpg`;
+   const up = await admin.storage.from(bucket).upload(path, bytes, { contentType: file.type, upsert: false });
+   if (up.error) return NextResponse.json({ error: 'Upload failed. Try again.' }, { status: 500 });
+ 
+   if (kind === 'listing') return NextResponse.json({ path });
+ 
++  // Profile photo: point the profile at the new photo, then remove the old one
++  if (kind === 'avatar') {
++    const { data: before } = await admin.from('profiles').select('avatar_path').eq('id', userId).maybeSingle();
++    const { error } = await admin.from('profiles').update({ avatar_path: path }).eq('id', userId);
++    if (error) {
++      await admin.storage.from(bucket).remove([path]);
++      return NextResponse.json({ error: 'Profile photos need one more database update (0017_profile_photos.sql).' }, { status: 500 });
++    }
++    const old = (before as { avatar_path?: string | null } | null)?.avatar_path;
++    if (old && old !== path) await admin.storage.from(bucket).remove([old]);
++    return NextResponse.json({ path });
++  }
++
+   const { data: message, error } = await admin.from('messages')
+     .insert({ offer_id: offerId, sender_id: userId, image_path: path })
+     .select('id,sender_id,body,image_path,created_at').single();
+diff --git a/src/app/campus/page.tsx b/src/app/campus/page.tsx
+index 9ac41eb..14ede8d 100644
+--- a/src/app/campus/page.tsx
++++ b/src/app/campus/page.tsx
+@@ -1,11 +1,10 @@
+ 'use client';
+ 
+ import { useCallback, useEffect, useRef, useState } from 'react';
+-import Link from 'next/link';
+ import { supabase } from '@/lib/supabase';
+-import { bannedMatch, blockedAnywhere } from '@/lib/banned';
++import { blockedAnywhere } from '@/lib/banned';
+ import { screenText } from '@/lib/screen';
+-import { friendlyError, type Listing, type Profile } from '@/lib/trade';
++import { friendlyError, type Profile } from '@/lib/trade';
+ import { useAuth } from '@/components/AuthProvider';
+ import { Icon } from '@/components/Icon';
+ import { Avatar, BottomNav } from '@/components/ui';
+@@ -17,8 +16,6 @@ type Post = {
+   like_count: number; comment_count: number; liked: boolean;
+ };
+ type Comment = { id: string; author_id: string; body: string; created_at: string; author: Profile | null };
+-type Iso = { id: string; author_id: string; want: string; can_offer: string | null; open: boolean; created_at: string; author: Profile | null };
+-type IsoResponse = { iso_id: string; responder_id: string; listing: { id: string; title: string } | null; responder: Profile | null };
+ 
+ const ago = (iso: string) => {
+   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+@@ -30,19 +27,20 @@ const ago = (iso: string) => {
+ const asProfile = (p: Post): Profile => ({ id: p.author_id, first_name: p.author_first, last_initial: p.author_initial });
+ 
+ export default function Campus() {
+-  const [tab, setTab] = useState<'feed' | 'iso'>('feed');
+-  // Opening Campus clears its badge (and keeps it clear while you're here)
+-  const { counts, markRead } = useNotifications();
+-  useEffect(() => { if (counts.campus) markRead({ tab: 'campus' }); }, [counts.campus, markRead]);
++  // Opening Campus clears its badge (answers to "Looking for" posts are cleared on Wanted instead)
++  const { unread, markRead } = useNotifications();
++  const feedUnread = unread.filter((n) => n.tab === 'campus' && n.kind !== 'iso');
++  useEffect(() => {
++    feedUnread.forEach((n) => markRead(n.ref ? { ref: n.ref } : { tab: 'campus' }));
++  }, [feedUnread.length]); // eslint-disable-line react-hooks/exhaustive-deps
+   return (
+     <>
+       <main className="screen">
+-        <h1 className="title-tab">Campus</h1>
+-        <div className="segmented">
+-          <button className={tab === 'feed' ? 'on' : ''} onClick={() => setTab('feed')}>Trade feed</button>
+-          <button className={tab === 'iso' ? 'on' : ''} onClick={() => setTab('iso')}>ISO board</button>
++        <div>
++          <h1 className="title-tab">Campus</h1>
++          <p className="subtitle">Trades people shared, and this week&apos;s favorite</p>
+         </div>
+-        {tab === 'feed' ? <Feed /> : <IsoBoard />}
++        <Feed />
+       </main>
+       <BottomNav />
+     </>
+@@ -209,124 +207,3 @@ function Comments({ postId, onCount }: { postId: string; onCount: (n: number) =>
+     </div>
+   );
+ }
+-
+-// ---------------------------------------------------------------------------
+-// ISO board
+-// ---------------------------------------------------------------------------
+-function IsoBoard() {
+-  const { me } = useAuth();
+-  const [isos, setIsos] = useState<Iso[] | null>(null);
+-  const [responses, setResponses] = useState<IsoResponse[]>([]);
+-  const [closet, setCloset] = useState<Listing[]>([]);
+-  const [composing, setComposing] = useState(false);
+-  const [want, setWant] = useState('');
+-  const [canOffer, setCanOffer] = useState('');
+-  const [picking, setPicking] = useState<string | null>(null);
+-  const [error, setError] = useState('');
+-
+-  const load = useCallback(async () => {
+-    if (!me) return;
+-    const [{ data: i, error }, { data: r }, { data: c }] = await Promise.all([
+-      supabase.from('iso_posts').select('*, author:profiles!iso_posts_author_id_fkey(id,first_name,last_initial)').eq('open', true)
+-        .order('created_at', { ascending: false }).limit(50),
+-      supabase.from('iso_responses').select('iso_id,responder_id,listing:listings!iso_responses_listing_id_fkey(id,title),responder:profiles!iso_responses_responder_id_fkey(id,first_name,last_initial)'),
+-      supabase.from('listings').select('*').eq('owner_id', me.id).eq('status', 'active').order('created_at', { ascending: false }),
+-    ]);
+-    if (error) setError(friendlyError(error));
+-    setIsos((i ?? []) as unknown as Iso[]);
+-    setResponses((r ?? []) as unknown as IsoResponse[]);
+-    setCloset((c ?? []) as Listing[]);
+-  }, [me]);
+-
+-  useEffect(() => { load(); }, [load]);
+-
+-  const bad = bannedMatch(want) ?? bannedMatch(canOffer);
+-
+-  async function post() {
+-    setError('');
+-    const problem = await screenText(want, canOffer);
+-    if (problem) { setError(problem); return; }
+-    const { error } = await supabase.from('iso_posts').insert({ want: want.trim(), can_offer: canOffer.trim() || null });
+-    if (error) { setError(friendlyError(error)); return; }
+-    setWant(''); setCanOffer(''); setComposing(false); load();
+-  }
+-
+-  async function respond(isoId: string, listingId: string) {
+-    setError('');
+-    const { error } = await supabase.from('iso_responses').insert({ iso_id: isoId, listing_id: listingId });
+-    if (error && !/duplicate/i.test(error.message)) { setError(friendlyError(error)); return; }
+-    setPicking(null); load();
+-  }
+-
+-  async function close(isoId: string) {
+-    await supabase.from('iso_posts').update({ open: false }).eq('id', isoId);
+-    load();
+-  }
+-
+-  if (!isos || !me) return <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>;
+-
+-  return (
+-    <>
+-      {composing ? (
+-        <div className="card stack" style={{ gap: 10 }}>
+-          <input className="input" placeholder="What are you looking for?" maxLength={80} value={want} onChange={(e) => setWant(e.target.value)} />
+-          <input className="input" placeholder="What can you offer?" maxLength={120} value={canOffer} onChange={(e) => setCanOffer(e.target.value)} />
+-          {bad && <p className="error-text" style={{ margin: 0 }}>&quot;{bad.term}&quot; isn&apos;t allowed on bart.</p>}
+-          <div className="row" style={{ gap: 8 }}>
+-            <button className="btn small outline" style={{ border: '1px solid var(--border)' }} onClick={() => setComposing(false)}>Cancel</button>
+-            <button className="btn small pink" disabled={want.trim().length < 2 || !!bad} onClick={post}>Post</button>
+-          </div>
+-        </div>
+-      ) : (
+-        <button className="btn ink small" onClick={() => setComposing(true)}>Post what you&apos;re looking for</button>
+-      )}
+-
+-      {error && <div className="alert">{error}</div>}
+-      {isos.length === 0 && <div className="empty">Nothing yet.</div>}
+-
+-      {isos.map((i) => {
+-        const mine = i.author_id === me.id;
+-        const answers = responses.filter((r) => r.iso_id === i.id);
+-        const myAnswer = answers.find((r) => r.responder_id === me.id);
+-        return (
+-          <div key={i.id} className="card stack" style={{ gap: 8 }}>
+-            <div className="spread">
+-              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.4, color: 'var(--pink-link, #C8106A)' }}>IN SEARCH OF</span>
+-              <span className="meta">{mine ? 'You' : i.author?.first_name} · {ago(i.created_at)}</span>
+-            </div>
+-            <div style={{ fontSize: 16, fontWeight: 600 }}>{i.want}</div>
+-            {i.can_offer && <div className="meta" style={{ fontSize: 13 }}>Can offer: {i.can_offer}</div>}
+-
+-            {mine ? (
+-              <>
+-                {answers.map((a) => (
+-                  <Link key={a.responder_id} href={a.listing ? `/item/${a.listing.id}` : '#'} className="spread"
+-                    style={{ background: 'var(--green-tint)', borderRadius: 12, padding: '10px 12px', color: 'var(--ink)', fontSize: 14 }}>
+-                    <span><b>{a.responder?.first_name}</b> has {a.listing?.title}</span><span>›</span>
+-                  </Link>
+-                ))}
+-                <button className="text-btn" style={{ padding: 0, alignSelf: 'flex-start', color: 'var(--muted)', fontSize: 13 }} onClick={() => close(i.id)}>
+-                  {answers.length ? 'Found it' : 'Remove'}
+-                </button>
+-              </>
+-            ) : myAnswer ? (
+-              <span className="pill lime" style={{ alignSelf: 'flex-start', padding: '8px 14px' }}>Sent ✓ {myAnswer.listing?.title}</span>
+-            ) : picking === i.id ? (
+-              <div className="stack" style={{ gap: 8 }}>
+-                {closet.map((l) => (
+-                  <button key={l.id} className="check-row" style={{ minHeight: 44 }} onClick={() => respond(i.id, l.id)}>
+-                    <span className="row-title grow">{l.title}</span><span className="pill" style={{ background: 'var(--bg)' }}>{l.tier}</span>
+-                  </button>
+-                ))}
+-                <Link href={`/post?title=${encodeURIComponent(i.want)}`} className="btn small pink">List it</Link>
+-                <button className="text-btn" style={{ padding: 0, color: 'var(--muted)' }} onClick={() => setPicking(null)}>Cancel</button>
+-              </div>
+-            ) : (
+-              <button className="btn small ink" style={{ height: 40, borderRadius: 10 }} onClick={() => setPicking(i.id)}>I have this</button>
+-            )}
+-          </div>
+-        );
+-      })}
+-    </>
+-  );
+-}
+diff --git a/src/app/find/page.tsx b/src/app/find/page.tsx
+new file mode 100644
+index 0000000..8ac69fd
+--- /dev/null
++++ b/src/app/find/page.tsx
+@@ -0,0 +1,88 @@
++'use client';
++
++import { useEffect, useState } from 'react';
++import Link from 'next/link';
++import { supabase } from '@/lib/supabase';
++import { CATEGORIES, type Category, type Listing } from '@/lib/trade';
++import { useAuth } from '@/components/AuthProvider';
++import { Icon } from '@/components/Icon';
++import { BottomNav, ListingCard } from '@/components/ui';
++
++// Find: search everything that's up for trade (this used to be the search on Home)
++export default function Find() {
++  const { me } = useAuth();
++  const [category, setCategory] = useState<Category | 'all'>('all');
++  const [query, setQuery] = useState('');
++  const [listings, setListings] = useState<Listing[] | null>(null);
++  const [error, setError] = useState('');
++
++  useEffect(() => {
++    let cancelled = false;
++    const timer = setTimeout(async () => {
++      let q = supabase.from('listings').select('*').eq('status', 'active')
++        .order('created_at', { ascending: false }).limit(60);
++      if (category !== 'all') q = q.eq('category', category);
++      // Strip characters that have meaning in Supabase filter strings
++      const term = query.trim().replace(/[,()%*\\]/g, ' ');
++      if (term) q = q.or(`title.ilike.%${term}%,wants.ilike.%${term}%,description.ilike.%${term}%`);
++      const { data, error } = await q;
++      if (cancelled) return;
++      if (error) setError(error.message); else { setError(''); setListings(data as Listing[]); }
++    }, query ? 250 : 0);
++    return () => { cancelled = true; clearTimeout(timer); };
++  }, [category, query]);
++
++  const term = query.trim();
++  const found = listings?.length ?? 0;
++
++  return (
++    <>
++      <main className="screen">
++        <div>
++          <h1 className="title-tab">Find</h1>
++          <p className="subtitle">Search everything up for trade on campus</p>
++        </div>
++
++        <label className="search" style={{ height: 50, borderColor: 'var(--blue)', borderWidth: 1.5 }}>
++          <Icon name="search" size={20} />
++          <input type="search" placeholder='Try "lamp" or "tutoring"' value={query} onChange={(e) => setQuery(e.target.value)}
++            aria-label="Search listings" style={{ fontSize: 16 }} />
++        </label>
++
++        <div className="chips">
++          <button className={`chip ${category === 'all' ? 'on' : ''}`} onClick={() => setCategory('all')}>All</button>
++          {CATEGORIES.map((c) => (
++            <button key={c.id} className={`chip ${category === c.id ? 'on' : ''}`} onClick={() => setCategory(c.id)}>
++              {c.label}
++            </button>
++          ))}
++        </div>
++
++        {listings && (
++          <span className="meta" style={{ fontSize: 13, fontWeight: 600 }}>
++            {found
++              ? `${found} result${found === 1 ? '' : 's'}${term ? ` for “${term}”` : ''}`
++              : 'Nobody has that up for trade yet'}
++          </span>
++        )}
++
++        {error && <div className="alert">{error}</div>}
++        {!listings && !error && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
++        {listings && listings.length > 0 && (
++          <div className="grid2">
++            {listings.map((l) => <ListingCard key={l.id} listing={l} mine={l.owner_id === me?.id} />)}
++          </div>
++        )}
++
++        <div className="row" style={{ background: 'var(--pink-tint)', borderRadius: 16, padding: 14 }}>
++          <div className="grow">
++            <div style={{ fontSize: 14, fontWeight: 700 }}>{found ? 'Not seeing it?' : 'Ask for it instead'}</div>
++            <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Post what you&apos;re looking for on Wanted. People who have it can answer.</div>
++          </div>
++          <Link href={`/wanted?ask=${encodeURIComponent(term || '1')}`} className="btn pink small" style={{ width: 'auto', padding: '0 16px', height: 40, borderRadius: 10, flexShrink: 0 }}>Ask</Link>
++        </div>
++      </main>
++      <BottomNav />
++    </>
++  );
++}
+diff --git a/src/app/login/page.tsx b/src/app/login/page.tsx
+index 05fa555..31a2366 100644
+--- a/src/app/login/page.tsx
++++ b/src/app/login/page.tsx
+@@ -3,7 +3,7 @@
+ import { useEffect, useState } from 'react';
+ import { useRouter } from 'next/navigation';
+ import { supabase } from '@/lib/supabase';
+-import { friendlyError } from '@/lib/trade';
++import { friendlyError, HOUSE_RULES } from '@/lib/trade';
+ import { blockedAnywhere } from '@/lib/banned';
+ import { useAuth } from '@/components/AuthProvider';
+ import { Icon } from '@/components/Icon';
+@@ -22,12 +22,7 @@ function takeNext() {
+   return '/';
+ }
+ 
+-const RULES = [
+-  ['No exams, answer keys or graded work', "Tutoring is fine. Doing someone's homework isn't."],
+-  ['No drugs, alcohol, weapons or adult content', 'These listings get removed and accounts suspended.'],
+-  ['Meet on campus', 'Between 7:30 AM and 8 PM.'],
+-  ['Show up, or cancel early', 'Two no-shows means a short break from trading.'],
+-];
++const RULES = HOUSE_RULES;
+ 
+ export default function SignUp() {
+   const { session, me, refresh } = useAuth();
+diff --git a/src/app/me/page.tsx b/src/app/me/page.tsx
+index 9fedffa..7aacf97 100644
+--- a/src/app/me/page.tsx
++++ b/src/app/me/page.tsx
+@@ -2,40 +2,29 @@
+ 
+ import { useEffect, useState } from 'react';
+ import Link from 'next/link';
+-import { useRouter } from 'next/navigation';
+ import { supabase } from '@/lib/supabase';
+-import { displayName, type Listing } from '@/lib/trade';
++import { displayName, OFFER_SELECT, sides, type Listing, type Offer } from '@/lib/trade';
+ import { useAuth } from '@/components/AuthProvider';
+ import { Icon } from '@/components/Icon';
+-import { Avatar, BottomNav } from '@/components/ui';
++import { Avatar, ItemThumb, PushHeader } from '@/components/ui';
+ import { useNotifications } from '@/components/Notifications';
+-import { linkCalendar, linkResult, myCalendar, unlinkCalendar } from '@/lib/calendar';
+ 
+-const STATUS_LABEL: Record<Listing['status'], string> = {
+-  active: 'Live', in_trade: 'In a trade', traded: 'Traded', removed: 'Taken down',
++// Your profile: opened from the card on Home. Account things (photo, name, Google Calendar,
++// sign out) are in Settings.
++
++const STATUS: Record<Listing['status'], [string, string]> = {
++  active: ['Live', 'lime'], in_trade: ['In a trade', 'blue-tint'], traded: ['Traded', 'soft'], removed: ['Taken down', 'soft'],
+ };
+ 
+ export default function Me() {
+   const { me } = useAuth();
+   const { counts, markRead } = useNotifications();
+   useEffect(() => { if (counts.me) markRead({ tab: 'me' }); }, [counts.me, markRead]);
+-  const router = useRouter();
+-  const [tab, setTab] = useState<'closet' | 'saved'>('closet');
++  const [tab, setTab] = useState<'closet' | 'saved' | 'trades'>('closet');
+   const [closet, setCloset] = useState<Listing[]>([]);
+   const [saved, setSaved] = useState<Listing[]>([]);
++  const [trades, setTrades] = useState<Offer[] | null>(null);
+   const [stats, setStats] = useState<{ rating: number | null; trades: number } | null>(null);
+-  const [reviewer, setReviewer] = useState(false);
+-  const [calendar, setCalendar] = useState<{ account_email: string } | null | undefined>(undefined);
+-  const [calBusy, setCalBusy] = useState(false);
+-  const [calNote, setCalNote] = useState<{ ok: boolean; text: string } | null>(null);
+-
+-  // Coming back from Google: say how it went, then tidy the address bar
+-  useEffect(() => {
+-    const code = new URLSearchParams(window.location.search).get('calendar');
+-    if (!code) return;
+-    setCalNote(linkResult(code));
+-    window.history.replaceState(null, '', '/me');
+-  }, []);
+ 
+   useEffect(() => {
+     if (!me) return;
+@@ -43,101 +32,101 @@ export default function Me() {
+       .then(({ data }) => setCloset((data ?? []) as Listing[]));
+     supabase.from('saves').select('listing:listings(*)').order('created_at', { ascending: false })
+       .then(({ data }) => setSaved(((data ?? []) as unknown as { listing: Listing | null }[]).map((s) => s.listing).filter(Boolean) as Listing[]));
++    supabase.from('offers').select(OFFER_SELECT).eq('status', 'completed').order('updated_at', { ascending: false }).limit(50)
++      .then(({ data }) => setTrades((data ?? []) as unknown as Offer[]));
+     supabase.rpc('trader_stats', { p_user: me.id }).then(({ data }) => setStats(data?.[0] ?? null));
+-    supabase.rpc('is_reviewer').then(({ data }) => setReviewer(data === true));
+-    myCalendar().then(setCalendar);
+   }, [me]);
+ 
+-  async function signOut() {
+-    await supabase.auth.signOut();
+-    router.replace('/login');
+-  }
+-
+   if (!me) return null;
+   const traded = closet.filter((l) => l.status === 'traded').length;
+-  const rows = tab === 'closet' ? closet : saved;
++  const current = closet.filter((l) => l.status === 'active' || l.status === 'in_trade');
++  const rows = tab === 'closet' ? current : saved;
+ 
+   return (
+-    <>
+-      <main className="screen">
+-        <div className="row" style={{ gap: 14, marginTop: 8 }}>
+-          <Avatar profile={me} size={72} solid="pink" />
+-          <div>
+-            <div className="display" style={{ fontSize: 22 }}>{displayName(me)}</div>
+-            <span className="pill blue-tint" style={{ marginTop: 6 }}><Icon name="shield" size={14} /> Verified student</span>
+-          </div>
+-        </div>
++    <main className="screen no-nav">
++      <PushHeader title="Profile" back="/"
++        right={<Link href="/settings" className="chip row" style={{ gap: 6, height: 40, display: 'inline-flex', alignItems: 'center', color: 'var(--ink)' }}>
++          <Icon name="edit" size={16} /> Edit profile
++        </Link>} />
+ 
+-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+-          {[[String(stats?.trades ?? 0), 'Trades'], [stats?.rating ? String(stats.rating) : '–', 'Rating'], [String(closet.filter((l) => l.status === 'active').length), 'Live listings']]
+-            .map(([n, label]) => (
+-              <div key={label} className="card" style={{ borderRadius: 14, textAlign: 'center', padding: 12 }}>
+-                <div className="display" style={{ fontSize: 22 }}>{n}</div>
+-                <div className="meta">{label}</div>
+-              </div>
+-            ))}
++      <div className="row" style={{ gap: 16 }}>
++        <span style={{ display: 'inline-flex', borderRadius: 999, boxShadow: '0 0 0 3px #fff, 0 0 0 5px var(--pink)', margin: 5 }}>
++          <Avatar profile={me} size={80} solid="pink" photo={me.avatar_path} />
++        </span>
++        <div className="stack" style={{ gap: 6 }}>
++          <div className="display" style={{ fontSize: 24 }}>{displayName(me)}</div>
++          <span className="pill blue-tint" style={{ alignSelf: 'flex-start' }}><Icon name="shield" size={14} /> Verified student</span>
+         </div>
++      </div>
+ 
+-        {traded > 0 && (
+-          <div className="row" style={{ background: 'var(--green-tint)', borderRadius: 14, padding: '12px 14px', fontSize: 14, gap: 10 }}>
+-            <Icon name="check" size={20} />
+-            <span><b>{traded} item{traded === 1 ? '' : 's'}</b> kept out of the trash</span>
++      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
++        {[
++          [String(stats?.trades ?? 0), 'Trades'],
++          [stats?.rating ? `${stats.rating} ★` : '–', 'Rating'],
++          [String(current.length), 'In closet'],
++        ].map(([n, label]) => (
++          <div key={label} className="card" style={{ borderRadius: 14, textAlign: 'center', padding: 12 }}>
++            <div className="display" style={{ fontSize: 22 }}>{n}</div>
++            <div className="meta">{label}</div>
+           </div>
+-        )}
++        ))}
++      </div>
+ 
+-        <div className="segmented">
+-          <button className={tab === 'closet' ? 'on' : ''} onClick={() => setTab('closet')}>My closet</button>
+-          <button className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>Saved</button>
++      {traded > 0 && (
++        <div className="row" style={{ background: 'var(--green-tint)', borderRadius: 14, padding: '12px 14px', fontSize: 14, gap: 10 }}>
++          <Icon name="check" size={20} />
++          <span><b>{traded} item{traded === 1 ? '' : 's'}</b> kept out of the trash</span>
+         </div>
++      )}
+ 
+-        {rows.length === 0 && (
+-          <div className="empty">
+-            {tab === 'closet' ? <Link href="/post">Post your first item</Link> : 'Nothing saved yet.'}
+-          </div>
+-        )}
++      <div className="segmented">
++        <button className={tab === 'closet' ? 'on' : ''} onClick={() => setTab('closet')}>Closet</button>
++        <button className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>Saved</button>
++        <button className={tab === 'trades' ? 'on' : ''} onClick={() => setTab('trades')}>Trades</button>
++      </div>
++
++      {tab !== 'trades' && (
+         <div className="stack" style={{ gap: 8 }}>
++          {rows.length === 0 && tab === 'saved' && <div className="empty">Nothing saved yet. Tap the heart on an item to save it.</div>}
+           {rows.map((l) => (
+-            <Link key={l.id} href={`/item/${l.id}`} className="spread"
+-              style={{ background: 'var(--surface)', borderRadius: 12, padding: '12px 14px', color: 'var(--ink)', border: '1px solid var(--border-soft)' }}>
+-              <span style={{ fontSize: 14, fontWeight: 600 }}>{l.title}</span>
+-              <span className="meta">{l.tier} · {STATUS_LABEL[l.status]}</span>
++            <Link key={l.id} href={`/item/${l.id}`} className="row"
++              style={{ background: 'var(--surface)', borderRadius: 14, padding: '10px 12px', color: 'var(--ink)', border: '1px solid var(--border-soft)', gap: 12 }}>
++              <ItemThumb item={l} size={44} />
++              <span className="grow">
++                <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{l.title}</span>
++                <span className="meta">{l.tier}{l.wants ? ` · Wants: ${l.wants}` : ''}</span>
++              </span>
++              {tab === 'closet'
++                ? <span className={`pill ${STATUS[l.status][1]}`} style={{ fontSize: 11 }}>{STATUS[l.status][0]}</span>
++                : <span style={{ color: 'var(--pink)' }}><Icon name="heart" size={18} fill="currentColor" stroke={0} /></span>}
+             </Link>
+           ))}
++          {tab === 'closet' && (
++            <Link href="/post" className="btn small" style={{ background: 'transparent', color: 'var(--pink-text)', border: '1.5px dashed var(--pink)' }}>
++              <Icon name="plus" size={18} stroke={2.4} /> Add to your closet
++            </Link>
++          )}
+         </div>
++      )}
+ 
+-        <div className="card stack" style={{ gap: 8 }}>
+-          <div className="spread">
+-            <span className="row" style={{ gap: 10, fontWeight: 600, fontSize: 14 }}><Icon name="calendar" size={20} /> Google Calendar</span>
+-            {calendar === undefined ? null : calendar ? (
+-              <button className="text-btn" style={{ padding: 0, color: 'var(--muted)' }} disabled={calBusy}
+-                onClick={async () => { setCalBusy(true); await unlinkCalendar(); setCalendar(null); setCalBusy(false); setCalNote(null); }}>
+-                Unlink
+-              </button>
+-            ) : (
+-              <button className="text-btn" style={{ padding: 0 }} disabled={calBusy}
+-                onClick={async () => { setCalBusy(true); const err = await linkCalendar('/me'); if (err) { setCalNote({ ok: false, text: err }); setCalBusy(false); } }}>
+-                Link
+-              </button>
+-            )}
+-          </div>
+-          <p className="meta" style={{ margin: 0 }}>
+-            {calendar ? `Linked to ${calendar.account_email}. bart only sees when you're busy.` : 'Optional. Shows when you and the other person are both free.'}
+-          </p>
+-          {calNote && <p className="meta" style={{ margin: 0, color: calNote.ok ? 'var(--ink)' : 'var(--error)', fontWeight: 600 }}>{calNote.text}</p>}
++      {tab === 'trades' && (
++        <div className="stack" style={{ gap: 8 }}>
++          {!trades && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
++          {trades?.length === 0 && <div className="empty">No finished trades yet.</div>}
++          {trades?.map((o) => {
++            const { get, give } = sides(o, me.id);
++            const other = o.from_user === me.id ? o.to : o.from;
++            return (
++              <Link key={o.id} href={`/trades/${o.id}`} className="card stack" style={{ gap: 6, color: 'var(--ink)' }}>
++                <span className="meta">with {displayName(other)} · {new Date(o.updated_at ?? o.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
++                <span className="row" style={{ gap: 8, fontSize: 14, fontWeight: 600 }}>
++                  <span>{give?.title ?? 'Your item'}</span><span style={{ color: 'var(--pink)' }}>⇄</span><span>{get?.title ?? 'Their item'}</span>
++                </span>
++              </Link>
++            );
++          })}
+         </div>
+-
+-        {reviewer && (
+-          <Link href="/admin/reports" className="spread card" style={{ color: 'var(--ink)' }}>
+-            <span className="row" style={{ gap: 10, fontWeight: 600, fontSize: 14 }}><Icon name="flag" size={20} /> Review reports</span>
+-            <span className="meta">›</span>
+-          </Link>
+-        )}
+-
+-        <button className="text-btn" style={{ color: 'var(--muted)', alignSelf: 'center', display: 'flex', gap: 6, alignItems: 'center' }} onClick={signOut}>
+-          <Icon name="logout" size={18} /> Sign out
+-        </button>
+-      </main>
+-      <BottomNav />
+-    </>
++      )}
++    </main>
+   );
+ }
+diff --git a/src/app/page.tsx b/src/app/page.tsx
+index 01bb240..e986d76 100644
+--- a/src/app/page.tsx
++++ b/src/app/page.tsx
+@@ -1,37 +1,40 @@
+ 'use client';
+ 
+ import { useEffect, useState } from 'react';
++import Link from 'next/link';
+ import { supabase } from '@/lib/supabase';
+-import { CATEGORIES, type Category, type Listing } from '@/lib/trade';
++import { displayName, type Listing } from '@/lib/trade';
+ import { useAuth } from '@/components/AuthProvider';
+ import { Icon } from '@/components/Icon';
+-import { BottomNav, ListingCard, Logo } from '@/components/ui';
+-import Link from 'next/link';
+-import { useNotifications } from '@/components/Notifications';
++import { Avatar, BottomNav, ListingCard, Logo } from '@/components/ui';
++import { Badge, useNotifications } from '@/components/Notifications';
+ 
+ export default function Home() {
+   const { me } = useAuth();
+   const { counts } = useNotifications();
+-  const [category, setCategory] = useState<Category | 'all'>('all');
+-  const [query, setQuery] = useState('');
+   const [listings, setListings] = useState<Listing[] | null>(null);
++  const [stats, setStats] = useState<{ rating: number | null; trades: number } | null>(null);
++  const [inCloset, setInCloset] = useState<number | null>(null);
+   const [error, setError] = useState('');
+ 
+   useEffect(() => {
+-    let cancelled = false;
+-    const timer = setTimeout(async () => {
+-      let q = supabase.from('listings').select('*').eq('status', 'active')
+-        .order('created_at', { ascending: false }).limit(60);
+-      if (category !== 'all') q = q.eq('category', category);
+-      // Strip characters that have meaning in Supabase filter strings
+-      const term = query.trim().replace(/[,()%*\\]/g, ' ');
+-      if (term) q = q.or(`title.ilike.%${term}%,wants.ilike.%${term}%,description.ilike.%${term}%`);
+-      const { data, error } = await q;
+-      if (cancelled) return;
+-      if (error) setError(error.message); else { setError(''); setListings(data as Listing[]); }
+-    }, query ? 250 : 0);
+-    return () => { cancelled = true; clearTimeout(timer); };
+-  }, [category, query]);
++    supabase.from('listings').select('*').eq('status', 'active')
++      .order('created_at', { ascending: false }).limit(60)
++      .then(({ data, error }) => { if (error) setError(error.message); else setListings(data as Listing[]); });
++  }, []);
++
++  useEffect(() => {
++    if (!me) return;
++    supabase.rpc('trader_stats', { p_user: me.id }).then(({ data }) => setStats(data?.[0] ?? null));
++    supabase.from('listings').select('id', { count: 'exact', head: true }).eq('owner_id', me.id).in('status', ['active', 'in_trade'])
++      .then(({ count }) => setInCloset(count ?? 0));
++  }, [me]);
++
++  const summary = [
++    stats?.rating ? `${stats.rating} ★` : null,
++    stats ? `${stats.trades} trade${stats.trades === 1 ? '' : 's'}` : null,
++    inCloset !== null ? `${inCloset} in closet` : null,
++  ].filter(Boolean).join(' · ');
+ 
+   return (
+     <>
+@@ -43,39 +46,47 @@ export default function Home() {
+               <Icon name="shield" size={14} /> Penn verified
+             </span>
+           </div>
+-          <Link href="/activity" className="icon-btn" aria-label="Activity" style={{ position: 'relative' }}>
+-            <Icon name="bell" size={20} />
+-            {counts.all > 0 && <span style={{ position: 'absolute', top: 9, right: 10, width: 9, height: 9, borderRadius: 999, background: 'var(--pink)', border: '2px solid #fff', boxSizing: 'content-box' }} />}
+-          </Link>
++          <div className="row" style={{ gap: 8 }}>
++            <Link href="/activity" className="icon-btn" aria-label="Activity" style={{ position: 'relative' }}>
++              <Icon name="bell" size={20} />
++              {counts.all > 0 && <span style={{ position: 'absolute', top: 9, right: 10, width: 9, height: 9, borderRadius: 999, background: 'var(--pink)', border: '2px solid #fff', boxSizing: 'content-box' }} />}
++            </Link>
++            <Link href="/settings" className="icon-btn" aria-label="Settings">
++              <Icon name="gear" size={20} />
++            </Link>
++          </div>
+         </div>
+ 
+-        <label className="search">
+-          <Icon name="search" size={18} />
+-          <input placeholder="Textbooks, dorm stuff, skills..." value={query} onChange={(e) => setQuery(e.target.value)}
+-            aria-label="Search listings" />
+-        </label>
+-
+-        <div className="chips">
+-          <button className={`chip ${category === 'all' ? 'on' : ''}`} onClick={() => setCategory('all')}>All</button>
+-          {CATEGORIES.map((c) => (
+-            <button key={c.id} className={`chip ${category === c.id ? 'on' : ''}`} onClick={() => setCategory(c.id)}>
+-              {c.label}
+-            </button>
+-          ))}
+-        </div>
++        {me && (
++          <div className="card big stack" style={{ gap: 12, borderRadius: 20 }}>
++            <Link href="/me" aria-label="Open your profile" className="row" style={{ gap: 14, color: 'var(--ink)' }}>
++              <span style={{ position: 'relative', display: 'inline-flex', borderRadius: 999, boxShadow: '0 0 0 3px #fff, 0 0 0 5px var(--pink)', margin: 5 }}>
++                <Avatar profile={me} size={56} solid="pink" photo={me.avatar_path} />
++                <Badge n={counts.me} />
++              </span>
++              <span className="grow stack" style={{ gap: 2 }}>
++                <span className="display" style={{ fontSize: 20 }}>{displayName(me)}</span>
++                {summary && <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{summary}</span>}
++                <span className="meta-blue" style={{ fontSize: 13 }}>View your profile</span>
++              </span>
++              <span style={{ width: 36, height: 36, borderRadius: 999, background: 'var(--bg)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
++                <Icon name="chevron" size={18} stroke={2.4} />
++              </span>
++            </Link>
++            <Link href="/post" className="btn pink" style={{ height: 48 }}>
++              <Icon name="plus" size={20} stroke={2.4} /> Add to your closet
++            </Link>
++          </div>
++        )}
+ 
+         <div className="spread">
+           <h2 className="section-title">Fresh on campus</h2>
+-          {listings && <span className="meta" style={{ fontSize: 13 }}>{listings.length} listing{listings.length === 1 ? '' : 's'}</span>}
++          <Link href="/find" style={{ fontSize: 13, fontWeight: 600 }}>Search all</Link>
+         </div>
+ 
+         {error && <div className="alert">{error}</div>}
+         {!listings && !error && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
+-        {listings && listings.length === 0 && (
+-          <div className="empty">
+-            {query || category !== 'all' ? 'No matches.' : 'Nothing here yet.'}
+-          </div>
+-        )}
++        {listings && listings.length === 0 && <div className="empty">Nothing here yet.</div>}
+         {listings && listings.length > 0 && (
+           <div className="grid2">
+             {listings.map((l) => <ListingCard key={l.id} listing={l} mine={l.owner_id === me?.id} />)}
+diff --git a/src/app/settings/page.tsx b/src/app/settings/page.tsx
+new file mode 100644
+index 0000000..5505fbc
+--- /dev/null
++++ b/src/app/settings/page.tsx
+@@ -0,0 +1,182 @@
++'use client';
++
++import { useEffect, useRef, useState } from 'react';
++import Link from 'next/link';
++import { useRouter } from 'next/navigation';
++import { supabase } from '@/lib/supabase';
++import { blockedAnywhere } from '@/lib/banned';
++import { uploadAvatar } from '@/lib/photos';
++import { friendlyError, HOUSE_RULES } from '@/lib/trade';
++import { linkCalendar, linkResult, myCalendar, unlinkCalendar } from '@/lib/calendar';
++import { useAuth } from '@/components/AuthProvider';
++import { Icon } from '@/components/Icon';
++import { Avatar, PushHeader } from '@/components/ui';
++
++// Settings: opened from the gear on Home (and "Edit profile" on your profile)
++export default function Settings() {
++  const { me, refresh } = useAuth();
++  const router = useRouter();
++  const fileRef = useRef<HTMLInputElement>(null);
++  const [photoBusy, setPhotoBusy] = useState(false);
++  const [photoNote, setPhotoNote] = useState<{ ok: boolean; text: string } | null>(null);
++  const [first, setFirst] = useState('');
++  const [lastInitial, setLastInitial] = useState('');
++  const [nameNote, setNameNote] = useState<{ ok: boolean; text: string } | null>(null);
++  const [nameBusy, setNameBusy] = useState(false);
++  const [calendar, setCalendar] = useState<{ account_email: string } | null | undefined>(undefined);
++  const [calBusy, setCalBusy] = useState(false);
++  const [calNote, setCalNote] = useState<{ ok: boolean; text: string } | null>(null);
++  const [reviewer, setReviewer] = useState(false);
++  const [showRules, setShowRules] = useState(false);
++
++  useEffect(() => {
++    if (!me) return;
++    setFirst(me.first_name ?? '');
++    setLastInitial(me.last_initial ?? '');
++  }, [me]);
++
++  // Coming back from Google: say how it went, then tidy the address bar
++  useEffect(() => {
++    const code = new URLSearchParams(window.location.search).get('calendar');
++    if (code) { setCalNote(linkResult(code)); window.history.replaceState(null, '', '/settings'); }
++    myCalendar().then(setCalendar);
++    supabase.rpc('is_reviewer').then(({ data }) => setReviewer(data === true));
++  }, []);
++
++  if (!me) return null;
++
++  async function pickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
++    const file = e.target.files?.[0];
++    e.target.value = '';
++    if (!file) return;
++    setPhotoBusy(true); setPhotoNote(null);
++    try {
++      await uploadAvatar(file);
++      await refresh();
++      setPhotoNote({ ok: true, text: 'Photo updated.' });
++    } catch (err) {
++      setPhotoNote({ ok: false, text: (err as Error).message });
++    }
++    setPhotoBusy(false);
++  }
++
++  async function removePhoto() {
++    setPhotoBusy(true); setPhotoNote(null);
++    const { error } = await supabase.from('profiles').update({ avatar_path: null }).eq('id', me!.id);
++    if (error) setPhotoNote({ ok: false, text: friendlyError(error) }); else await refresh();
++    setPhotoBusy(false);
++  }
++
++  const nameChanged = first.trim() !== (me.first_name ?? '') || lastInitial.trim().toUpperCase() !== (me.last_initial ?? '');
++  const nameOk = first.trim().length >= 1 && !/\s/.test(first.trim()) && /^[a-z]$/i.test(lastInitial.trim()) && !blockedAnywhere(first);
++
++  async function saveName() {
++    setNameBusy(true); setNameNote(null);
++    const { error } = await supabase.from('profiles')
++      .update({ first_name: first.trim(), last_initial: lastInitial.trim().toUpperCase() }).eq('id', me!.id);
++    setNameBusy(false);
++    if (error) { setNameNote({ ok: false, text: friendlyError(error) }); return; }
++    await refresh();
++    setNameNote({ ok: true, text: 'Name saved.' });
++  }
++
++  async function signOut() {
++    await supabase.auth.signOut();
++    router.replace('/login');
++  }
++
++  const section = (title: string) => <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.5, color: 'var(--muted)', marginBottom: -6 }}>{title}</div>;
++
++  return (
++    <main className="screen no-nav">
++      <PushHeader title="Settings" back="/" />
++
++      {section('PROFILE')}
++      <div className="card stack" style={{ gap: 14 }}>
++        <div className="row" style={{ gap: 12 }}>
++          <Avatar profile={me} size={56} solid="pink" photo={me.avatar_path} />
++          <span className="grow" style={{ fontSize: 14, fontWeight: 600 }}>Profile photo</span>
++          {me.avatar_path && (
++            <button className="text-btn" style={{ padding: '0 6px', color: 'var(--muted)' }} disabled={photoBusy} onClick={removePhoto}>Remove</button>
++          )}
++          <button className="chip" style={{ borderColor: 'var(--blue)', color: 'var(--blue)', borderWidth: 1.5 }} disabled={photoBusy}
++            onClick={() => fileRef.current?.click()}>
++            {photoBusy ? 'Checking…' : me.avatar_path ? 'Change' : 'Add photo'}
++          </button>
++          <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickPhoto} />
++        </div>
++        {photoNote && <p className="meta" style={{ margin: 0, fontWeight: 600, color: photoNote.ok ? 'var(--ink)' : 'var(--error)' }}>{photoNote.text}</p>}
++
++        <div style={{ borderTop: '1px solid var(--border-soft)' }} />
++
++        <div className="row" style={{ gap: 8 }}>
++          <label className="grow stack" style={{ gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>
++            First name
++            <input className="input" style={{ height: 44 }} maxLength={40} value={first} onChange={(e) => setFirst(e.target.value)} />
++          </label>
++          <label className="stack" style={{ gap: 4, fontSize: 12, fontWeight: 600, color: 'var(--muted)', width: 90 }}>
++            Last initial
++            <input className="input" style={{ height: 44, textAlign: 'center' }} maxLength={1} value={lastInitial} onChange={(e) => setLastInitial(e.target.value)} />
++          </label>
++        </div>
++        <p className="meta" style={{ margin: 0 }}>Shown as &quot;{first.trim() || 'First'}{lastInitial.trim() ? ` ${lastInitial.trim().toUpperCase()}.` : ''}&quot;. First names are one word.</p>
++        {nameChanged && (
++          <button className="btn small" disabled={!nameOk || nameBusy} onClick={saveName}>{nameBusy ? 'Saving…' : 'Save name'}</button>
++        )}
++        {nameNote && <p className="meta" style={{ margin: 0, fontWeight: 600, color: nameNote.ok ? 'var(--ink)' : 'var(--error)' }}>{nameNote.text}</p>}
++      </div>
++
++      {section('CONNECTED')}
++      <div className="card stack" style={{ gap: 8 }}>
++        <div className="spread">
++          <span className="row" style={{ gap: 12, fontWeight: 600, fontSize: 14 }}>
++            <span style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--blue-tint)', color: 'var(--blue-dark)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
++              <Icon name="calendar" size={18} />
++            </span>
++            Google Calendar
++          </span>
++          {calendar === undefined ? null : calendar ? (
++            <button className="chip" disabled={calBusy}
++              onClick={async () => { setCalBusy(true); await unlinkCalendar(); setCalendar(null); setCalBusy(false); setCalNote(null); }}>
++              Unlink
++            </button>
++          ) : (
++            <button className="chip" style={{ background: 'var(--blue)', color: '#fff', borderColor: 'var(--blue)' }} disabled={calBusy}
++              onClick={async () => { setCalBusy(true); const err = await linkCalendar('/settings'); if (err) { setCalNote({ ok: false, text: err }); setCalBusy(false); } }}>
++              Link
++            </button>
++          )}
++        </div>
++        <p className="meta" style={{ margin: 0 }}>
++          {calendar ? `Linked to ${calendar.account_email}. bart only sees when you're busy.` : 'Optional. Shows when you and the other person are both free.'}
++        </p>
++        {calNote && <p className="meta" style={{ margin: 0, color: calNote.ok ? 'var(--ink)' : 'var(--error)', fontWeight: 600 }}>{calNote.text}</p>}
++      </div>
++
++      {section('ACCOUNT')}
++      <div className="card stack" style={{ gap: 0, padding: '0 14px' }}>
++        <button className="spread" onClick={() => setShowRules(!showRules)}
++          style={{ minHeight: 48, background: 'none', border: 'none', padding: 0, fontSize: 14, fontWeight: 600, width: '100%' }}>
++          House rules <span className="meta" style={{ fontSize: 16 }}>{showRules ? '−' : '›'}</span>
++        </button>
++        {showRules && (
++          <div className="stack" style={{ gap: 8, paddingBottom: 12 }}>
++            {HOUSE_RULES.map(([t, sub]) => (
++              <div key={t}><div className="row-title">{t}</div><div className="row-sub">{sub}</div></div>
++            ))}
++          </div>
++        )}
++        {reviewer && (
++          <Link href="/admin/reports" className="spread" style={{ minHeight: 48, color: 'var(--ink)', borderTop: '1px solid var(--border-soft)', fontSize: 14, fontWeight: 600 }}>
++            <span className="row" style={{ gap: 10 }}><Icon name="flag" size={18} /> Review reports</span>
++            <span className="meta" style={{ fontSize: 16 }}>›</span>
++          </Link>
++        )}
++      </div>
++
++      <button className="text-btn" style={{ color: 'var(--error)', alignSelf: 'center', display: 'flex', gap: 6, alignItems: 'center' }} onClick={signOut}>
++        <Icon name="logout" size={18} /> Sign out
++      </button>
++    </main>
++  );
++}
+diff --git a/src/app/wanted/page.tsx b/src/app/wanted/page.tsx
+new file mode 100644
+index 0000000..b8320a0
+--- /dev/null
++++ b/src/app/wanted/page.tsx
+@@ -0,0 +1,271 @@
++'use client';
++
++import { useCallback, useEffect, useMemo, useState } from 'react';
++import Link from 'next/link';
++import { supabase } from '@/lib/supabase';
++import { bannedMatch } from '@/lib/banned';
++import { screenText } from '@/lib/screen';
++import { friendlyError, type Listing, type Profile } from '@/lib/trade';
++import { useAuth } from '@/components/AuthProvider';
++import { Icon } from '@/components/Icon';
++import { Avatar, BottomNav } from '@/components/ui';
++import { useNotifications } from '@/components/Notifications';
++
++// Wanted: what people on campus are looking for (this used to be the ISO board on Campus).
++// Same tables as before: iso_posts ("Looking for" posts) and iso_responses ("I have it").
++
++type Iso = { id: string; author_id: string; want: string; can_offer: string | null; open: boolean; created_at: string; author: Profile | null };
++type IsoResponse = { iso_id: string; responder_id: string; listing: { id: string; title: string } | null; responder: Profile | null };
++
++const ago = (iso: string) => {
++  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
++  if (m < 1) return 'now';
++  if (m < 60) return `${m}m`;
++  if (m < 1440) return `${Math.round(m / 60)}h`;
++  return `${Math.round(m / 1440)}d`;
++};
++
++// Loose word match between a request and your closet: "desk lamp" finds "Clip-on desk lamp"
++const STOP = new Set(['the', 'and', 'for', 'with', 'any', 'some', 'size', 'new', 'used', 'one', 'pair', 'like', 'need', 'want', 'looking', 'good']);
++const words = (s: string) => new Set(
++  s.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !STOP.has(w)).map((w) => (w.length > 3 ? w.replace(/s$/, '') : w)),
++);
++function matchFor(want: string, closet: Listing[]) {
++  const w = words(want);
++  return closet.find((l) => [...words(l.title)].some((t) => w.has(t))) ?? null;
++}
++
++const DISMISS_KEY = 'bart-wanted-dismissed';
++const readDismissed = (): string[] => { try { return JSON.parse(localStorage.getItem(DISMISS_KEY) ?? '[]'); } catch { return []; } };
++
++export default function Wanted() {
++  const { me } = useAuth();
++  const { unread, markRead } = useNotifications();
++  const [tab, setTab] = useState<'yours' | 'all'>('yours');
++  const [isos, setIsos] = useState<Iso[] | null>(null);
++  const [responses, setResponses] = useState<IsoResponse[]>([]);
++  const [closet, setCloset] = useState<Listing[]>([]);
++  const [dismissed, setDismissed] = useState<string[]>([]);
++  const [composing, setComposing] = useState(false);
++  const [want, setWant] = useState('');
++  const [canOffer, setCanOffer] = useState('');
++  const [query, setQuery] = useState('');
++  const [picking, setPicking] = useState<string | null>(null);
++  const [error, setError] = useState('');
++
++  // Opened from Find's "Ask" button: start a request, filled in with what they searched for
++  useEffect(() => {
++    setDismissed(readDismissed());
++    const ask = new URLSearchParams(window.location.search).get('ask');
++    if (ask) {
++      setComposing(true); setTab('all');
++      if (ask !== '1') setWant(ask.slice(0, 80));
++      window.history.replaceState(null, '', '/wanted');
++    }
++  }, []);
++
++  // Seeing Wanted clears the "someone has it" badges
++  const isoUnread = unread.filter((n) => n.kind === 'iso');
++  useEffect(() => {
++    isoUnread.forEach((n) => { if (n.ref) markRead({ ref: n.ref }); });
++  }, [isoUnread.length]); // eslint-disable-line react-hooks/exhaustive-deps
++
++  const load = useCallback(async () => {
++    if (!me) return;
++    const [{ data: i, error }, { data: r }, { data: c }] = await Promise.all([
++      supabase.from('iso_posts').select('*, author:profiles!iso_posts_author_id_fkey(id,first_name,last_initial)').eq('open', true)
++        .order('created_at', { ascending: false }).limit(100),
++      supabase.from('iso_responses').select('iso_id,responder_id,listing:listings!iso_responses_listing_id_fkey(id,title),responder:profiles!iso_responses_responder_id_fkey(id,first_name,last_initial)'),
++      supabase.from('listings').select('*').eq('owner_id', me.id).eq('status', 'active').order('created_at', { ascending: false }),
++    ]);
++    if (error) setError(friendlyError(error));
++    setIsos((i ?? []) as unknown as Iso[]);
++    setResponses((r ?? []) as unknown as IsoResponse[]);
++    setCloset((c ?? []) as Listing[]);
++  }, [me]);
++
++  useEffect(() => { load(); }, [load]);
++
++  // Requests from other people that something in your closet could answer
++  const matches = useMemo(() => {
++    if (!isos || !me) return [];
++    return isos
++      .filter((i) => i.author_id !== me.id && !dismissed.includes(i.id))
++      .map((i) => ({ iso: i, item: matchFor(i.want, closet), answer: responses.find((r) => r.iso_id === i.id && r.responder_id === me.id) }))
++      .filter((m) => m.item || m.answer);
++  }, [isos, closet, responses, dismissed, me]);
++  const openMatches = matches.filter((m) => !m.answer).length;
++
++  const bad = bannedMatch(want) ?? bannedMatch(canOffer);
++
++  async function post() {
++    setError('');
++    const problem = await screenText(want, canOffer);
++    if (problem) { setError(problem); return; }
++    const { error } = await supabase.from('iso_posts').insert({ want: want.trim(), can_offer: canOffer.trim() || null });
++    if (error) { setError(friendlyError(error)); return; }
++    setWant(''); setCanOffer(''); setComposing(false); load();
++  }
++
++  async function respond(isoId: string, listingId: string) {
++    setError('');
++    const { error } = await supabase.from('iso_responses').insert({ iso_id: isoId, listing_id: listingId });
++    if (error && !/duplicate/i.test(error.message)) { setError(friendlyError(error)); return; }
++    setPicking(null); load();
++  }
++
++  async function close(isoId: string) {
++    await supabase.from('iso_posts').update({ open: false }).eq('id', isoId);
++    load();
++  }
++
++  function notNow(isoId: string) {
++    const next = [...dismissed, isoId];
++    setDismissed(next);
++    try { localStorage.setItem(DISMISS_KEY, JSON.stringify(next.slice(-200))); } catch {}
++  }
++
++  const q = query.trim().toLowerCase();
++  const all = (isos ?? [])
++    .filter((i) => !q || `${i.want} ${i.can_offer ?? ''}`.toLowerCase().includes(q))
++    .sort((a, b) => Number(b.author_id === me?.id) - Number(a.author_id === me?.id));
++
++  return (
++    <>
++      <main className="screen">
++        <div className="spread" style={{ alignItems: 'flex-start' }}>
++          <div>
++            <h1 className="title-tab">Wanted</h1>
++            <p className="subtitle">What people on campus are looking for</p>
++          </div>
++          <button className="btn pink small" style={{ width: 'auto', padding: '0 14px', height: 40, borderRadius: 999, marginTop: 4 }}
++            onClick={() => { setComposing(true); setTab('all'); }}>
++            <Icon name="plus" size={16} stroke={2.6} /> Ask
++          </button>
++        </div>
++
++        <div className="segmented">
++          <button className={tab === 'yours' ? 'on' : ''} onClick={() => setTab('yours')}>
++            Wants your stuff{openMatches ? ` (${openMatches})` : ''}
++          </button>
++          <button className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>All requests</button>
++        </div>
++
++        {error && <div className="alert">{error}</div>}
++        {(!isos || !me) && <div className="empty"><div className="spinner" style={{ margin: '0 auto' }} /></div>}
++
++        {isos && me && tab === 'yours' && (
++          <>
++            {matches.length > 0 && <p className="body" style={{ fontSize: 13 }}>These people want something already in your closet.</p>}
++            {matches.length === 0 && (
++              <div className="empty">
++                {closet.length
++                  ? 'Nobody is asking for anything in your closet right now. We\'ll show requests here when they match.'
++                  : <>Add things to your closet and we&apos;ll show who wants them. <Link href="/post">Add to your closet</Link></>}
++              </div>
++            )}
++            {matches.map(({ iso, item, answer }) => (
++              <div key={iso.id} className="card big stack" style={{ gap: 10 }}>
++                <div className="row" style={{ gap: 10 }}>
++                  <Avatar profile={iso.author} size={36} />
++                  <span className="grow" style={{ fontSize: 14, lineHeight: 1.35 }}>
++                    <b>{iso.author?.first_name ?? 'Someone'}</b> is looking for <b>{iso.want}</b>
++                  </span>
++                  <span className="meta">{ago(iso.created_at)}</span>
++                </div>
++                <div className="row" style={{ gap: 8, alignItems: 'stretch' }}>
++                  <div className="swap-box" style={{ background: 'var(--lime)' }}>
++                    <div className="k" style={{ color: 'var(--ink)' }}>You have</div>
++                    <div className="v">{answer?.listing?.title ?? item?.title}</div>
++                  </div>
++                  <div className="swap-box" style={{ background: 'var(--bg)' }}>
++                    <div className="k">They can give</div>
++                    <div className="v">{iso.can_offer || 'Open to offers'}</div>
++                  </div>
++                </div>
++                {answer ? (
++                  <span className="pill green-tint" style={{ alignSelf: 'flex-start', padding: '6px 12px', fontSize: 13 }}>
++                    ✓ Sent to {iso.author?.first_name ?? 'them'}
++                  </span>
++                ) : item && (
++                  <div className="row" style={{ gap: 8 }}>
++                    <button className="btn small outline" style={{ width: 'auto', padding: '0 16px', border: '1px solid var(--border)' }} onClick={() => notNow(iso.id)}>Not now</button>
++                    <button className="btn small pink grow" onClick={() => respond(iso.id, item.id)}>Offer my {item.title}</button>
++                  </div>
++                )}
++              </div>
++            ))}
++          </>
++        )}
++
++        {isos && me && tab === 'all' && (
++          <>
++            {composing && (
++              <div className="card stack" style={{ gap: 10 }}>
++                <input className="input" placeholder="What are you looking for?" maxLength={80} value={want} onChange={(e) => setWant(e.target.value)} autoFocus />
++                <input className="input" placeholder="What can you give for it?" maxLength={120} value={canOffer} onChange={(e) => setCanOffer(e.target.value)} />
++                {bad && <p className="error-text" style={{ margin: 0 }}>&quot;{bad.term}&quot; isn&apos;t allowed on bart.</p>}
++                <div className="row" style={{ gap: 8 }}>
++                  <button className="btn small outline" style={{ border: '1px solid var(--border)' }} onClick={() => setComposing(false)}>Cancel</button>
++                  <button className="btn small pink" disabled={want.trim().length < 2 || !!bad} onClick={post}>Post</button>
++                </div>
++              </div>
++            )}
++
++            <label className="search">
++              <Icon name="search" size={18} />
++              <input type="search" placeholder="Search requests" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search requests" />
++            </label>
++
++            {all.length === 0 && <div className="empty">{q ? 'No requests match.' : 'Nobody has asked for anything yet.'}</div>}
++
++            {all.map((i) => {
++              const mine = i.author_id === me.id;
++              const answers = responses.filter((r) => r.iso_id === i.id);
++              const myAnswer = answers.find((r) => r.responder_id === me.id);
++              return (
++                <div key={i.id} className="card stack" style={{ gap: 8 }}>
++                  <div className="spread">
++                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: '#C8106A' }}>{mine ? 'YOU\'RE LOOKING FOR' : 'LOOKING FOR'}</span>
++                    <span className="meta">{mine ? 'You' : i.author?.first_name} · {ago(i.created_at)}</span>
++                  </div>
++                  <div style={{ fontSize: 16, fontWeight: 600 }}>{i.want}</div>
++                  {i.can_offer && <div className="meta" style={{ fontSize: 13 }}>Can give: {i.can_offer}</div>}
++
++                  {mine ? (
++                    <>
++                      {answers.map((a) => (
++                        <Link key={a.responder_id} href={a.listing ? `/item/${a.listing.id}` : '#'} className="spread"
++                          style={{ background: 'var(--green-tint)', borderRadius: 12, padding: '10px 12px', color: 'var(--ink)', fontSize: 14 }}>
++                          <span><b>{a.responder?.first_name}</b> has {a.listing?.title}</span><span>›</span>
++                        </Link>
++                      ))}
++                      <button className="text-btn" style={{ padding: 0, alignSelf: 'flex-start', color: 'var(--muted)', fontSize: 13 }} onClick={() => close(i.id)}>
++                        {answers.length ? 'Found it' : 'Remove'}
++                      </button>
++                    </>
++                  ) : myAnswer ? (
++                    <span className="pill lime" style={{ alignSelf: 'flex-start', padding: '8px 14px' }}>Sent ✓ {myAnswer.listing?.title}</span>
++                  ) : picking === i.id ? (
++                    <div className="stack" style={{ gap: 8 }}>
++                      {closet.map((l) => (
++                        <button key={l.id} className="check-row" style={{ minHeight: 44 }} onClick={() => respond(i.id, l.id)}>
++                          <span className="row-title grow">{l.title}</span><span className="pill" style={{ background: 'var(--bg)' }}>{l.tier}</span>
++                        </button>
++                      ))}
++                      <Link href="/post" className="btn small pink">Add it to your closet first</Link>
++                      <button className="text-btn" style={{ padding: 0, color: 'var(--muted)' }} onClick={() => setPicking(null)}>Cancel</button>
++                    </div>
++                  ) : (
++                    <button className="btn small ink" style={{ height: 40, borderRadius: 10 }} onClick={() => setPicking(i.id)}>I have it</button>
++                  )}
++                </div>
++              );
++            })}
++          </>
++        )}
++      </main>
++      <BottomNav />
++    </>
++  );
++}
+diff --git a/src/components/AuthProvider.tsx b/src/components/AuthProvider.tsx
+index b027ca5..be42e8a 100644
+--- a/src/components/AuthProvider.tsx
++++ b/src/components/AuthProvider.tsx
+@@ -8,7 +8,7 @@ import { setExtraTerms } from '@/lib/banned';
+ import { Loading } from './ui';
+ import { NotificationsProvider } from './Notifications';
+ 
+-type Me = { id: string; first_name: string | null; last_initial: string | null; rules_accepted_at: string | null };
++type Me = { id: string; first_name: string | null; last_initial: string | null; rules_accepted_at: string | null; avatar_path?: string | null };
+ type AuthState = { session: Session | null; me: Me | null; ready: boolean; refresh: () => Promise<void> };
+ 
+ const AuthContext = createContext<AuthState>({ session: null, me: null, ready: false, refresh: async () => {} });
+@@ -30,6 +30,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
+     const { data } = await supabase.from('profiles')
+       .select('id,first_name,last_initial,rules_accepted_at').eq('id', s.user.id).single();
+     setMe(data ?? null);
++    // Profile photo, asked for separately so sign-in still works if 0017_profile_photos.sql hasn't been run yet
++    supabase.from('profiles').select('avatar_path').eq('id', s.user.id).maybeSingle().then(({ data: p, error }) => {
++      if (!error) setMe((m) => (m && m.id === s.user.id ? { ...m, avatar_path: (p as { avatar_path: string | null } | null)?.avatar_path ?? null } : m));
++    });
+     // Is this account paused right now?
+     const { data: pauses } = await supabase.from('suspensions').select('until,lifted_at')
+       .is('lifted_at', null).order('created_at', { ascending: false }).limit(5);
+diff --git a/src/components/Icon.tsx b/src/components/Icon.tsx
+index 4cd25a7..ccc9341 100644
+--- a/src/components/Icon.tsx
++++ b/src/components/Icon.tsx
+@@ -23,6 +23,10 @@ const paths: Record<string, React.ReactNode> = {
+   trophy: <><path d="M8 4h8v5a4 4 0 0 1-8 0V4Z" /><path d="M8 6H4.5v1.5A3.5 3.5 0 0 0 8 11" /><path d="M16 6h3.5v1.5A3.5 3.5 0 0 1 16 11" /><path d="M12 13v4" /><path d="M8.5 20h7" /><path d="M10 17h4v3h-4z" /></>,
+   bell: <><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" /><path d="M10 20.5a2 2 0 0 0 4 0" /></>,
+   logout: <><path d="M15 4h4v16h-4" /><path d="M10 8l-4 4 4 4" /><path d="M6 12h10" /></>,
++  gear: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></>,
++  megaphone: <><path d="M3 10v4h3l6 5V5l-6 5H3Z" /><path d="M16 9a4 4 0 0 1 0 6" /><path d="M19 6.5a8 8 0 0 1 0 11" /></>,
++  chevron: <path d="m9 5 7 7-7 7" />,
++  edit: <><path d="M4 20h4L19 9l-4-4L4 16v4Z" /><path d="m13.5 6.5 4 4" /></>,
+   box: <><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5v-9Z" /><path d="M3.5 7.5 12 12l8.5-4.5" /><path d="M12 12v9" /></>,
+   // Item placeholder icons (drawn at stroke 1.6)
+   fridge: <><rect x="6" y="2.5" width="12" height="19" rx="2" /><path d="M6 10h12" /><path d="M9 6v1.5" /><path d="M9 13v3" /></>,
+diff --git a/src/components/ui.tsx b/src/components/ui.tsx
+index f38e3b4..c23876b 100644
+--- a/src/components/ui.tsx
++++ b/src/components/ui.tsx
+@@ -2,7 +2,7 @@
+ 
+ import Link from 'next/link';
+ import { usePathname, useRouter } from 'next/navigation';
+-import { Icon } from './Icon';
++import { Icon, type IconName } from './Icon';
+ import { Badge, useNotifications } from './Notifications';
+ import { photoUrl } from '@/lib/supabase';
+ import { CATEGORY_ICON, CATEGORY_TINT, type Listing, type Profile, initial } from '@/lib/trade';
+@@ -13,10 +13,13 @@ export function Logo({ height = 30 }: { height?: number }) {
+   return <img src="/brand/bart-logo-horizontal-color.svg" alt="bart" style={{ height, width: 'auto' }} />;
+ }
+ 
++// Home, Find, Wanted, Campus, Chats. Your profile and "Add to your closet" live on Home now.
+ export function BottomNav() {
+   const path = usePathname();
+-  const { counts } = useNotifications();
+-  const item = (href: string, icon: 'home' | 'people' | 'chat' | 'person', label: string, badge = 0) => {
++  const { counts, unread } = useNotifications();
++  // Answers to your "Looking for" posts are campus notifications of kind 'iso'; they badge Wanted instead
++  const wanted = unread.filter((n) => n.kind === 'iso').length;
++  const item = (href: string, icon: IconName, label: string, badge = 0) => {
+     const on = href === '/' ? path === '/' : path.startsWith(href);
+     return (
+       <Link href={href} className={on ? 'on' : ''}>
+@@ -28,12 +31,10 @@ export function BottomNav() {
+   return (
+     <nav className="nav" aria-label="Main">
+       {item('/', 'home', 'Home')}
+-      {item('/campus', 'people', 'Campus', counts.campus)}
+-      <Link href="/post" aria-label="Post an item">
+-        <span className="plus"><Icon name="plus" size={24} stroke={2.4} /></span>
+-      </Link>
++      {item('/find', 'search', 'Find')}
++      {item('/wanted', 'megaphone', 'Wanted', wanted)}
++      {item('/campus', 'people', 'Campus', Math.max(0, counts.campus - wanted))}
+       {item('/trades', 'chat', 'Chats', counts.trades)}
+-      {item('/me', 'person', 'Me', counts.me)}
+     </nav>
+   );
+ }
+@@ -54,7 +55,14 @@ export function PushHeader({ title, back, right }: {
+ }
+ 
+ const AVATAR_TINTS = ['var(--pink-tint)', 'var(--green-tint)', 'var(--blue-tint)'];
+-export function Avatar({ profile, size = 40, solid }: { profile?: Profile | null; size?: number; solid?: 'blue' | 'pink' }) {
++// A profile photo when there is one (photo = profiles.avatar_path), otherwise the first initial
++export function Avatar({ profile, size = 40, solid, photo }: {
++  profile?: Profile | null; size?: number; solid?: 'blue' | 'pink'; photo?: string | null;
++}) {
++  if (photo) {
++    // eslint-disable-next-line @next/next/no-img-element
++    return <img src={photoUrl(photo)} alt="" className="avatar" style={{ width: size, height: size, objectFit: 'cover' }} />;
++  }
+   // Stable tint per person
+   const n = (profile?.id ?? '').split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+   const style: React.CSSProperties = solid
+diff --git a/src/lib/photos.ts b/src/lib/photos.ts
+index 5bb6728..679b103 100644
+--- a/src/lib/photos.ts
++++ b/src/lib/photos.ts
+@@ -36,6 +36,14 @@ export async function uploadPhoto(_userId: string, file: File): Promise<string>
+   return (await sendToCheck(form)).path as string;
+ }
+ 
++// Profile photo: the server checks it, stores it and points your profile at it
++export async function uploadAvatar(file: File): Promise<string> {
++  const form = new FormData();
++  form.append('file', await shrink(file), 'photo.jpg');
++  form.append('kind', 'avatar');
++  return (await sendToCheck(form)).path as string;
++}
++
+ // Chat photos: the server checks it, stores it privately, and adds it to the chat
+ export async function uploadChatPhoto(offerId: string, file: File) {
+   const form = new FormData();
+diff --git a/src/lib/trade.ts b/src/lib/trade.ts
+index 7f6c1a7..62ad3b8 100644
+--- a/src/lib/trade.ts
++++ b/src/lib/trade.ts
+@@ -22,6 +22,14 @@ export const CATEGORY_TINT: Record<Category, string> = {
+   textbooks: 'tint-pink', dorm: 'tint-blue', clothes: 'tint-green', tickets: 'tint-blue', skills: 'tint-pink', misc: 'tint-green',
+ };
+ 
++// The 4 house rules everyone agrees to at sign-up (also shown in Settings)
++export const HOUSE_RULES: [string, string][] = [
++  ['No exams, answer keys or graded work', "Tutoring is fine. Doing someone's homework isn't."],
++  ['No drugs, alcohol, weapons or adult content', 'These listings get removed and accounts suspended.'],
++  ['Meet on campus', 'Between 7:30 AM and 8 PM.'],
++  ['Show up, or cancel early', 'Two no-shows means a short break from trading.'],
++];
++
+ export const SWEETENERS = ['Coffee on me', 'Help moving it', 'Class notes'] as const;
+ 
+ // Fairness meter: S = 1, M = 2, L = 3 (Skill counts as M), each sweetener = 0.5.
+diff --git a/supabase/migrations/0017_profile_photos.sql b/supabase/migrations/0017_profile_photos.sql
+new file mode 100644
+index 0000000..61cada8
+--- /dev/null
++++ b/supabase/migrations/0017_profile_photos.sql
+@@ -0,0 +1,27 @@
++-- bart: profile photos
++--
++-- Adds an optional profile photo. Like every other photo, it goes through the server
++-- (src/app/api/photo/route.ts, kind = "avatar"), which checks it with AI and only then
++-- stores it in the public listing-photos bucket under <user id>/avatar-<random>.jpg.
++--
++-- Safe to run before the redesign branch is merged: it only adds a nullable column.
++
++alter table profiles add column if not exists avatar_path text;
++
++-- A profile can only point at a photo in its own folder that the server named as an avatar.
++-- Phones can't upload into that folder themselves (0009_safety.sql removed that), so any
++-- file there has passed the photo check.
++create or replace function profiles_check_avatar() returns trigger
++language plpgsql as $$
++begin
++  if new.avatar_path is not null
++     and new.avatar_path !~ ('^' || new.id::text || '/avatar-[0-9a-f]{32}\.jpg$') then
++    raise exception 'That photo can''t be used as a profile photo.';
++  end if;
++  return new;
++end $$;
++
++drop trigger if exists profiles_avatar_check on profiles;
++create trigger profiles_avatar_check
++  before insert or update of avatar_path on profiles
++  for each row execute function profiles_check_avatar();
+-- 
+2.43.0
+
