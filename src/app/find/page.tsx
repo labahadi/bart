@@ -29,6 +29,9 @@ export default function Find() {
   const [typing, setTyping] = useState(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const router = useRouter();
+  const [compact, setCompact] = useState(false);
+  useEffect(() => { try { setCompact(localStorage.getItem('bart-find-compact') === '1'); } catch {} }, []);
+  const setView = (c: boolean) => { setCompact(c); try { localStorage.setItem('bart-find-compact', c ? '1' : '0'); } catch {} };
 
   function onType(value: string) {
     setQuery(value);
@@ -98,9 +101,20 @@ export default function Find() {
         </div>
 
         {!sniffing && found > 0 && (
-          <span className="meta" style={{ fontSize: 13, fontWeight: 600 }}>
-            {`${found} result${found === 1 ? '' : 's'}${term ? ` for “${term}”` : ''}`}
-          </span>
+          <div className="spread" style={{ alignItems: 'center' }}>
+            <span className="meta" style={{ fontSize: 13, fontWeight: 600 }}>
+              {`${found} result${found === 1 ? '' : 's'}${term ? ` for “${term}”` : ''}`}
+            </span>
+            {/* Big cards (2 across) or compact (3 across); remembered on this phone */}
+            <div className="view-toggle" role="group" aria-label="Card size">
+              <button className={!compact ? 'on' : ''} aria-pressed={!compact} aria-label="Big cards" onClick={() => setView(false)}>
+                <svg width="18" height="18" viewBox="0 0 18 18"><rect x="1" y="1" width="7" height="7" rx="2.2" /><rect x="10" y="1" width="7" height="7" rx="2.2" /><rect x="1" y="10" width="7" height="7" rx="2.2" /><rect x="10" y="10" width="7" height="7" rx="2.2" /></svg>
+              </button>
+              <button className={compact ? 'on' : ''} aria-pressed={compact} aria-label="Compact cards" onClick={() => setView(true)}>
+                <svg width="18" height="18" viewBox="0 0 18 18">{[1, 6.75, 12.5].flatMap((x) => [1, 6.75, 12.5].map((y) => <rect key={`${x}-${y}`} x={x} y={y} width="4.5" height="4.5" rx="1.4" />))}</svg>
+              </button>
+            </div>
+          </div>
         )}
 
         {error && <div className="alert">{error}</div>}
@@ -137,8 +151,8 @@ export default function Find() {
           </div>
         )}
         {!sniffing && found > 0 && listings && (
-          <div className="grid2">
-            {listings.map((l, i) => <ListingCard key={l.id} listing={l} mine={l.owner_id === me?.id} position={i} />)}
+          <div className={compact ? 'grid3' : 'grid2'}>
+            {listings.map((l, i) => <ListingCard key={l.id} listing={l} mine={l.owner_id === me?.id} position={i} compact={compact} />)}
           </div>
         )}
 

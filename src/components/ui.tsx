@@ -156,28 +156,28 @@ export function ItemThumb({ item, size = 48, radius = 12 }: {
 }
 
 // position = the card's spot in its grid, so no-photo cards alternate colors and neighbors never match
-export function ListingCard({ listing, mine, position = 0 }: { listing: Listing; mine?: boolean; position?: number }) {
+export function ListingCard({ listing, mine, position = 0, compact = false }: { listing: Listing; mine?: boolean; position?: number; compact?: boolean }) {
   const { ids, toggle } = useSaved();
   const colors = artColors(position);
   const photo = !!listing.photo_paths?.length;
   const saved = ids.has(listing.id);
   return (
-    <Link href={`/item/${listing.id}`} className="listing-card">
+    <Link href={`/item/${listing.id}`} className={`listing-card${compact ? ' compact' : ''}`}>
       <div className={`img ${photo ? '' : `tint-${colors[0]}`}`}>
-        <ItemImage listing={listing} colors={colors} />
+        <ItemImage listing={listing} colors={colors} iconSize={compact ? 36 : 54} />
         <span className="tier">{listing.tier}</span>
         {mine
           ? <span className="corner pill ink" style={{ fontSize: 11 }}>Yours</span>
           : (
             <button className={`card-heart${saved ? ' on' : ''}`} aria-label={saved ? 'Unsave item' : 'Save item'} aria-pressed={saved}
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggle(listing.id); }}>
-              <Icon name="heart" size={15} fill={saved ? 'currentColor' : 'none'} stroke={2.2} />
+              <Icon name="heart" size={compact ? 12 : 15} fill={saved ? 'currentColor' : 'none'} stroke={2.2} />
             </button>
           )}
       </div>
       <div className="bd">
         <div className="t">{listing.title}</div>
-        {listing.wants && <div className="meta">For {listing.wants}</div>}
+        {listing.wants && !compact && <div className="meta">For {listing.wants}</div>}
       </div>
     </Link>
   );
