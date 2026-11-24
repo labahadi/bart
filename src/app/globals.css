@@ -427,3 +427,21 @@ a.card:active, button.card:active, .segmented button:active { transform: scale(0
   display: inline-flex; align-items: center; justify-content: center; transition: background 0.2s ease, color 0.2s ease; }
 .view-toggle button svg { fill: currentColor; }
 .view-toggle button.on { background: var(--blue); color: #fff; }
+/* Meetup: "Pick on map" row and the full-screen map */
+.check-row.map-row { border-color: var(--blue); background: var(--blue-tint); box-shadow: none; color: var(--blue); }
+.check-row.map-row .row-title { color: var(--navy); }
+.map-row-icon { width: 36px; height: 36px; border-radius: 12px; background: var(--blue); color: #fff; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; }
+.map-picker { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: flex; flex-direction: column; animation: fade-in 0.2s ease both; }
+.map-picker-top { display: flex; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top) + 12px) 20px 12px; }
+.map-picker-map { flex: 1; min-height: 0; background: #E8ECF8; }
+.map-picker-map .leaflet-control-attribution { font-size: 9px; }
+.map-pin { background: none; border: none; }
+.map-picker-hint { position: absolute; top: calc(env(safe-area-inset-top) + 80px); left: 50%; transform: translateX(-50%); z-index: 500;
+  background: var(--navy); color: #fff; font-size: 12px; font-weight: 700; padding: 8px 14px; border-radius: 999px; white-space: nowrap; pointer-events: none; }
+.map-picker-sheet { position: relative; z-index: 500; margin-top: -24px; background: var(--surface); border-radius: 28px 28px 0 0;
+  padding: 14px 20px calc(env(safe-area-inset-bottom) + 20px); box-shadow: 0 -8px 30px rgba(27, 42, 140, 0.12); display: flex; flex-direction: column; gap: 14px; }
+.map-picker-grab { width: 40px; height: 5px; border-radius: 9px; background: #DDE1EE; align-self: center; }
+.map-picker-badge { width: 46px; height: 46px; border-radius: 999px; background: var(--blue-tint); color: var(--blue); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; }
+.map-picker-badge.bad { background: var(--pink-tint); color: var(--pink); font-size: 22px; }
