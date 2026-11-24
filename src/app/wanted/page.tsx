@@ -61,7 +61,7 @@ export default function Wanted() {
   // Back from adding something to the closet: reopen that request with the new item ticked
   useEffect(() => {
     const answering = new URLSearchParams(window.location.search).get('answering');
-    if (!answering) return;
+    if (!answering) { takeReturnedPicks(); return; }
     setTab('all');
     startPicking(answering, takeReturnedPicks() ?? []);
   }, []);
@@ -182,7 +182,7 @@ export default function Wanted() {
               <div className="empty">
                 {closet.length
                   ? 'Nobody is asking for anything in your closet right now. We\'ll show requests here when they match.'
-                  : <>Add things to your closet and we&apos;ll show who wants them. <Link href="/post">Add to your closet</Link></>}
+                  : <>Add things to your closet and we&apos;ll show who wants them. <Link href={addToClosetHref('/wanted', [])}>Add to your closet</Link></>}
               </div>
             )}
             {matches.map(({ iso, item, answer }) => (

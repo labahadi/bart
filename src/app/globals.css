@@ -413,3 +413,17 @@ a.card:active, button.card:active, .segmented button:active { transform: scale(0
 .check-row.add-row { box-shadow: none; background: transparent; border: 2px dashed var(--dashed); color: var(--blue); text-decoration: none; }
 .check-row.add-row .row-title { color: var(--blue); }
 .add-plus { width: 24px; height: 24px; border-radius: 999px; background: var(--blue); color: #fff; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+
+/* Find: compact view, 3 smaller cards across */
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; animation: soft-in 0.25s ease-out both; }
+.listing-card.compact .img { height: 96px; border-radius: 20px; }
+.listing-card.compact .tier { top: 6px; left: 6px; font-size: 10px; padding: 2px 7px; }
+.listing-card.compact .corner { top: 6px; right: 6px; font-size: 9px !important; padding: 2px 7px; }
+.listing-card.compact .card-heart { width: 26px; height: 26px; bottom: 6px; right: 6px; }
+.listing-card.compact .bd { padding-top: 6px; }
+.listing-card.compact .t { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.view-toggle { display: inline-flex; background: var(--surface); border-radius: 999px; padding: 3px; box-shadow: var(--shadow); }
+.view-toggle button { width: 34px; height: 30px; border: none; border-radius: 999px; background: transparent; color: var(--muted);
+  display: inline-flex; align-items: center; justify-content: center; transition: background 0.2s ease, color 0.2s ease; }
+.view-toggle button svg { fill: currentColor; }
+.view-toggle button.on { background: var(--blue); color: #fff; }
