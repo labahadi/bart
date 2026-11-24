@@ -172,11 +172,11 @@ function Feed() {
               </button>
             </span>
           </div>
-          {open === `top-${top.id}` && (
+          <Expand open={open === `top-${top.id}`}>
             <div style={{ background: '#fff', color: 'var(--ink)', borderRadius: 18, padding: '2px 12px 12px', position: 'relative' }}>
-              <Comments postId={top.id} onCount={(n) => setPosts((ps) => ps?.map((x) => x.id === top.id ? { ...x, comment_count: n } : x) ?? null)} />
+              <Comments postId={top.id} expected={top.comment_count} onCount={(n) => setPosts((ps) => ps?.map((x) => x.id === top.id ? { ...x, comment_count: n } : x) ?? null)} />
             </div>
-          )}
+          </Expand>
         </div>
       )}
 
@@ -207,14 +207,35 @@ function Feed() {
               Comment{p.comment_count ? ` · ${p.comment_count}` : ''}
             </button>
           </div>
-          {open === p.id && <Comments postId={p.id} onCount={(n) => setPosts((ps) => ps?.map((x) => x.id === p.id ? { ...x, comment_count: n } : x) ?? null)} />}
+          <Expand open={open === p.id}>
+            <Comments postId={p.id} expected={p.comment_count} onCount={(n) => setPosts((ps) => ps?.map((x) => x.id === p.id ? { ...x, comment_count: n } : x) ?? null)} />
+          </Expand>
         </div>
       ))}
     </>
   );
 }
 
-function Comments({ postId, onCount }: { postId: string; onCount: (n: number) => void }) {
+// Opens and closes its content smoothly (height and fade), and keeps it on screen while it closes
+function Expand({ open, children }: { open: boolean; children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(open);
+  const [shown, setShown] = useState(open);
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      // Wait a frame so the browser sees the closed state first, then animates open
+      const f = requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
+      return () => cancelAnimationFrame(f);
+    }
+    setShown(false);
+    const t = setTimeout(() => setMounted(false), 300);
+    return () => clearTimeout(t);
+  }, [open]);
+  if (!mounted) return null;
+  return <div className={`expand${shown ? ' open' : ''}`}><div>{children}</div></div>;
+}
+
+function Comments({ postId, expected, onCount }: { postId: string; expected: number; onCount: (n: number) => void }) {
   const { me } = useAuth();
   const [list, setList] = useState<Comment[] | null>(null);
   const [text, setText] = useState('');
@@ -252,8 +273,12 @@ function Comments({ postId, onCount }: { postId: string; onCount: (n: number) =>
 
   return (
     <div className="stack" style={{ gap: 8, borderTop: '1px solid var(--border-soft)', paddingTop: 10 }}>
+      {/* Hold space for the comments while they load, so the box doesn't jump when they arrive */}
+      {!list && Array.from({ length: Math.min(expected, 4) }, (_, i) => (
+        <div key={i} className="skeleton" style={{ height: 13, margin: '2px 0', width: `${80 - i * 15}%` }} />
+      ))}
       {list?.map((c) => (
-        <div key={c.id} className="spread" style={{ alignItems: 'flex-start', fontSize: 13 }}>
+        <div key={c.id} className="spread comment-in" style={{ alignItems: 'flex-start', fontSize: 13 }}>
           <span><ProfileLink id={c.author_id}><b>{c.author?.first_name ?? 'Student'}</b></ProfileLink> {c.body}</span>
           {c.author_id === me?.id && (
             <button className="text-btn" style={{ padding: 0, fontSize: 12, color: 'var(--muted)' }} onClick={() => remove(c.id)}>Delete</button>
