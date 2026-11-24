@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { bannedMatch } from '@/lib/banned';
 import { screenText } from '@/lib/screen';
 import { friendlyError, type Listing, type Profile } from '@/lib/trade';
+import { addToClosetHref, takeReturnedPicks } from '@/lib/returnTo';
 import { useAuth } from '@/components/AuthProvider';
 import { Icon } from '@/components/Icon';
 import { Avatar, ProfileLink } from '@/components/ui';
@@ -51,7 +52,19 @@ export default function Wanted() {
   const [want, setWant] = useState('');
   const [canOffer, setCanOffer] = useState('');
   const [query, setQuery] = useState('');
+  // "I have it": pick one or more things from your closet, then send them together
   const [picking, setPicking] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [sending, setSending] = useState(false);
+  const startPicking = (isoId: string | null, ids: string[] = []) => { setPicking(isoId); setChosen(ids); };
+  const toggle = (id: string) => setChosen((c) => c.includes(id) ? c.filter((x) => x !== id) : [...c, id]);
+  // Back from adding something to the closet: reopen that request with the new item ticked
+  useEffect(() => {
+    const answering = new URLSearchParams(window.location.search).get('answering');
+    if (!answering) return;
+    setTab('all');
+    startPicking(answering, takeReturnedPicks() ?? []);
+  }, []);
   const [error, setError] = useState('');
 
   // Opened from Find's "Ask" button: start a request, filled in with what they searched for
@@ -110,11 +123,16 @@ export default function Wanted() {
     setWant(''); setCanOffer(''); setComposing(false); load();
   }
 
-  async function respond(isoId: string, listingId: string) {
-    setError('');
-    const { error } = await supabase.from('iso_responses').insert({ iso_id: isoId, listing_id: listingId });
-    if (error && !/duplicate/i.test(error.message)) { setError(friendlyError(error)); return; }
-    setPicking(null); load();
+  async function respond(isoId: string, listingIds: string[]) {
+    if (!listingIds.length) return;
+    setError(''); setSending(true);
+    // One at a time, so one that was already sent doesn't stop the others
+    for (const listing_id of listingIds) {
+      const { error } = await supabase.from('iso_responses').insert({ iso_id: isoId, listing_id });
+      if (error && !/duplicate/i.test(error.message)) { setSending(false); setError(friendlyError(error)); load(); return; }
+    }
+    setSending(false);
+    startPicking(null); load();
   }
 
   async function close(isoId: string) {
@@ -193,7 +211,11 @@ export default function Wanted() {
                 ) : item && (
                   <div className="row" style={{ gap: 8 }}>
                     <button className="btn small outline" style={{ width: 'auto', padding: '0 16px', boxShadow: 'var(--shadow)' }} onClick={() => notNow(iso.id)}>Not now</button>
-                    <button className="btn small pink grow" onClick={() => respond(iso.id, item.id)}>Offer my {item.title}</button>
+                    <button className="btn small pink grow" onClick={() => {
+                      // Opens the picker on that request with this item ticked, so more can be added before sending
+                      setTab('all'); setQuery(''); startPicking(iso.id, [item.id]);
+                      setTimeout(() => document.getElementById(`iso-${iso.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+                    }}>Offer my {item.title}</button>
                   </div>
                 )}
               </div>
@@ -225,9 +247,9 @@ export default function Wanted() {
             {all.map((i) => {
               const mine = i.author_id === me.id;
               const answers = responses.filter((r) => r.iso_id === i.id);
-              const myAnswer = answers.find((r) => r.responder_id === me.id);
+              const myAnswers = answers.filter((r) => r.responder_id === me.id);
               return (
-                <div key={i.id} className="card stack" style={{ gap: 8 }}>
+                <div key={i.id} id={`iso-${i.id}`} className="card stack" style={{ gap: 8 }}>
                   <div className="spread">
                     <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: '#C8106A' }}>{mine ? 'YOU\'RE LOOKING FOR' : 'LOOKING FOR'}</span>
                     <span className="meta">{mine ? 'You' : <ProfileLink id={i.author_id} style={{ fontWeight: 600 }}>{i.author?.first_name}</ProfileLink>} · {ago(i.created_at)}</span>
@@ -238,7 +260,7 @@ export default function Wanted() {
                   {mine ? (
                     <>
                       {answers.map((a) => (
-                        <Link key={a.responder_id} href={a.listing ? `/item/${a.listing.id}` : '#'} className="spread"
+                        <Link key={`${a.responder_id}-${a.listing?.id}`} href={a.listing ? `/item/${a.listing.id}` : '#'} className="spread"
                           style={{ background: 'var(--green-tint)', borderRadius: 12, padding: '10px 12px', color: 'var(--ink)', fontSize: 14 }}>
                           <span><b>{a.responder?.first_name}</b> has {a.listing?.title}</span><span>›</span>
                         </Link>
@@ -247,20 +269,36 @@ export default function Wanted() {
                         {answers.length ? 'Found it' : 'Remove'}
                       </button>
                     </>
-                  ) : myAnswer ? (
-                    <span className="pill lime" style={{ alignSelf: 'flex-start', padding: '8px 14px' }}>Sent ✓ {myAnswer.listing?.title}</span>
                   ) : picking === i.id ? (
                     <div className="stack" style={{ gap: 8 }}>
-                      {closet.map((l) => (
-                        <button key={l.id} className="check-row" style={{ minHeight: 44 }} onClick={() => respond(i.id, l.id)}>
-                          <span className="row-title grow">{l.title}</span><span className="pill" style={{ background: 'var(--bg)' }}>{l.tier}</span>
+                      <span className="meta">Pick everything you could give. You can choose more than one.</span>
+                      {closet.filter((l) => !myAnswers.some((a) => a.listing?.id === l.id)).map((l) => {
+                        const on = chosen.includes(l.id);
+                        return (
+                          <button key={l.id} className={`check-row${on ? ' on' : ''}`} style={{ minHeight: 48 }} onClick={() => toggle(l.id)} aria-pressed={on}>
+                            <span className="box">{on && <Icon name="check" size={14} stroke={3} />}</span>
+                            <span className="row-title grow">{l.title}</span><span className="pill" style={{ background: 'var(--bg)' }}>{l.tier}</span>
+                          </button>
+                        );
+                      })}
+                      <Link href={addToClosetHref(`/wanted?answering=${i.id}`, chosen)} className="check-row add-row">
+                        <span className="add-plus"><Icon name="plus" size={16} stroke={2.8} /></span>
+                        <span className="row-title grow">Add something to your closet</span>
+                      </Link>
+                      <div className="row" style={{ gap: 8 }}>
+                        <button className="btn small outline" style={{ width: 'auto', padding: '0 16px', boxShadow: 'var(--shadow)' }} onClick={() => startPicking(null)}>Cancel</button>
+                        <button className="btn small pink grow" disabled={!chosen.length || sending} onClick={() => respond(i.id, chosen)}>
+                          {sending ? 'Sending…' : chosen.length > 1 ? `Send ${chosen.length} items` : chosen.length ? 'Send it' : 'Pick something'}
                         </button>
-                      ))}
-                      <Link href="/post" className="btn small pink">Add it to your closet first</Link>
-                      <button className="text-btn" style={{ padding: 0, color: 'var(--muted)' }} onClick={() => setPicking(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : myAnswers.length ? (
+                    <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                      <span className="pill lime" style={{ padding: '8px 14px' }}>Sent ✓ {myAnswers.map((a) => a.listing?.title).join(', ')}</span>
+                      <button className="text-btn" style={{ padding: 0, fontSize: 13 }} onClick={() => startPicking(i.id)}>Offer more</button>
                     </div>
                   ) : (
-                    <button className="btn small ink" style={{ height: 40, borderRadius: 10 }} onClick={() => setPicking(i.id)}>I have it</button>
+                    <button className="btn small ink" style={{ height: 40, borderRadius: 10 }} onClick={() => startPicking(i.id)}>I have it</button>
                   )}
                 </div>
               );

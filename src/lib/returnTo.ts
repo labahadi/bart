@@ -8,7 +8,7 @@ export function safeBack(path: string | null): string | null {
 
 // The link to the closet form from a trade screen, remembering what was already picked
 export function addToClosetHref(here: string, picked: string[]) {
-  const back = picked.length ? `${here}?picked=${picked.join(',')}` : here;
+  const back = picked.length ? withParam(here, 'picked', picked.join(',')) : here;
   return `/post?back=${encodeURIComponent(back)}`;
 }
 
