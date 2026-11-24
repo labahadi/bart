@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: 'bart',
   description: 'Trade with verified students on your campus. No money, just swaps.',
   manifest: '/manifest.webmanifest',
-  icons: { icon: '/favicon-32.png', apple: '/apple-touch-icon.png' },
+  icons: { icon: { url: '/favicon.png', type: 'image/png', sizes: '64x64' }, apple: '/apple-touch-icon.png' },
   appleWebApp: { capable: true, title: 'bart', statusBarStyle: 'default' },
 };
 
