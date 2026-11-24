@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/brand/bart-logo-horizontal-color.svg" alt="bart" height="64">
+  <img src="public/brand/bart-logo-dog.png" alt="bart" height="72">
 </p>
 
 <h3 align="center">You're broke. So is everyone else.</h3>
