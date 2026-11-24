@@ -7,6 +7,7 @@ import { OFFER_SELECT, type Offer } from '@/lib/trade';
 import { Icon } from '@/components/Icon';
 import { Loading, PushHeader } from '@/components/ui';
 import { useAuth } from '@/components/AuthProvider';
+import { MapPicker } from '@/components/MapPicker';
 import { clock, hhmm, nyInstant, nyParts } from '@/lib/time';
 import { clash, freeTimes, linkCalendar, linkResult, type FreeTimes } from '@/lib/calendar';
 
@@ -27,6 +28,7 @@ export default function Meetup() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<{ placeId: string; name: string; detail: string }[]>([]);
   const [picked, setPicked] = useState<{ placeId: string; name: string; detail: string } | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
   const [walkMin, setWalkMin] = useState<number | null>(null);
   const [checking, setChecking] = useState(false);
   // One Google search session per place picked (keeps searches cheap)
@@ -192,6 +194,14 @@ export default function Meetup() {
                   </span>
                 </button>
               ))}
+              <button className="check-row map-row" onClick={() => setMapOpen(true)}>
+                <span className="map-row-icon"><Icon name="pin" size={20} /></span>
+                <span className="grow stack" style={{ gap: 1 }}>
+                  <span className="row-title">Pick on map</span>
+                  <span className="row-sub">Drop a pin anywhere on campus</span>
+                </span>
+                <Icon name="chevron" size={18} />
+              </button>
             </div>
           ) : (
             <div className="card spread" style={{ gap: 8 }}>
@@ -206,6 +216,7 @@ export default function Meetup() {
 
         {error && <div className="alert"><Icon name="warning" size={18} />{error}</div>}
       </main>
+      {mapOpen && <MapPicker onClose={() => setMapOpen(false)} onPick={(p) => { setMapOpen(false); setQuery(''); pick(p); }} />}
       <div className="action-bar">
         <button className="btn pink" disabled={!timeOk || !picked || checking || busy} onClick={save}>
           {busy ? 'Sending…' : !timeOk ? 'Pick a time' : !picked ? 'Pick a place' : `Propose ${day.wd} ${timeLabel} · ${picked.name}`}
