@@ -8,7 +8,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(data.title || 'bart', {
     body: data.body || '',
     icon: '/icon-512.png',
-    badge: '/favicon-32.png',
+    badge: '/favicon.png',
     tag: data.tag || undefined,
     data: { url: data.url || '/' },
   }));
