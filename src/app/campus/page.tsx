@@ -14,6 +14,7 @@ import { useNotifications } from '@/components/Notifications';
 
 type Post = {
   id: string; offer_id: string; author_id: string; author_first: string | null; author_initial: string | null; author_avatar?: string | null;
+  partner_id?: string | null; partner_first?: string | null; partner_initial?: string | null; partner_avatar?: string | null;
   gave: string; got: string; note: string | null; created_at: string;
   like_count: number; comment_count: number; liked: boolean;
 };
@@ -48,6 +49,11 @@ type Featured = { post_id: string; week_start: string; last_week: boolean };
 // Each card alternates its two item colors
 const SIDE_TINTS = [['tint-blue', 'tint-pink'], ['tint-green', 'tint-blue']] as const;
 const asProfile = (p: Post): Profile => ({ id: p.author_id, first_name: p.author_first, last_initial: p.author_initial, avatar_path: p.author_avatar });
+// The other person in the trade (null on posts from before both names were shown)
+const asPartner = (p: Post): Profile | null => (p.partner_id
+  ? { id: p.partner_id, first_name: p.partner_first ?? null, last_initial: p.partner_initial ?? null, avatar_path: p.partner_avatar }
+  : null);
+const short = (first: string | null | undefined, initial: string | null | undefined) => `${first ?? 'Someone'}${initial ? ` ${initial}.` : ''}`;
 
 export default function Campus() {
   // Notifications stay until you tap them in Activity (or Clear all there).
@@ -155,14 +161,22 @@ function Feed() {
           </div>
           <span className="totw-week">{weekRange(featured!.week_start)}</span>
           <div className="spread">
-            <ProfileLink id={top.author_id} style={{ color: '#fff' }}>
-              <span className="row" style={{ gap: 8 }}>
-                <span style={{ display: 'inline-flex', borderRadius: 999, boxShadow: '0 0 0 2px #fff' }}><Avatar profile={asProfile(top)} size={32} /></span>
-                <span style={{ fontSize: 13, fontWeight: 600 }}>
-                  {top.author_first}{top.author_initial ? ` ${top.author_initial}.` : ''}
-                </span>
+            <span className="row" style={{ gap: 8, minWidth: 0 }}>
+              <span className="row" style={{ flexShrink: 0 }}>
+                <ProfileLink id={top.author_id}>
+                  <span style={{ display: 'inline-flex', borderRadius: 999, boxShadow: '0 0 0 2px #fff' }}><Avatar profile={asProfile(top)} size={32} /></span>
+                </ProfileLink>
+                {asPartner(top) && (
+                  <ProfileLink id={top.partner_id} style={{ marginLeft: -10 }}>
+                    <span style={{ display: 'inline-flex', borderRadius: 999, boxShadow: '0 0 0 2px #fff' }}><Avatar profile={asPartner(top)!} size={32} /></span>
+                  </ProfileLink>
+                )}
               </span>
-            </ProfileLink>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', lineHeight: 1.3 }}>
+                <ProfileLink id={top.author_id} style={{ color: '#fff' }}>{short(top.author_first, top.author_initial)}</ProfileLink>
+                {asPartner(top) && <> barted with <ProfileLink id={top.partner_id} style={{ color: '#fff' }}>{short(top.partner_first, top.partner_initial)}</ProfileLink></>}
+              </span>
+            </span>
             <span className="row" style={{ gap: 6 }}>
               <button onClick={() => setOpen(open === `top-${top.id}` ? null : `top-${top.id}`)} className="totw-btn ghost" aria-label="Comments">
                 <Icon name="chat" size={15} />{top.comment_count ? ` ${top.comment_count}` : ''}
@@ -186,9 +200,17 @@ function Feed() {
       {posts.map((p, i) => (
         <div key={p.id} id={`post-${p.id}`} className="card stack" style={{ gap: 12 }}>
           <div className="row" style={{ gap: 10 }}>
-            <ProfileLink id={p.author_id}><Avatar profile={asProfile(p)} size={36} /></ProfileLink>
-            <div className="grow" style={{ fontSize: 14 }}>
-              <ProfileLink id={p.author_id}><b>{p.author_first}{p.author_initial ? ` ${p.author_initial}.` : ''}</b></ProfileLink> traded
+            <span className="row" style={{ flexShrink: 0 }}>
+              <ProfileLink id={p.author_id}><Avatar profile={asProfile(p)} size={36} /></ProfileLink>
+              {asPartner(p) && (
+                <ProfileLink id={p.partner_id} style={{ marginLeft: -12 }}>
+                  <span style={{ display: 'inline-flex', borderRadius: 999, boxShadow: '0 0 0 2px var(--surface)' }}><Avatar profile={asPartner(p)!} size={36} /></span>
+                </ProfileLink>
+              )}
+            </span>
+            <div className="grow" style={{ fontSize: 14, lineHeight: 1.35, minWidth: 0 }}>
+              <ProfileLink id={p.author_id}><b>{short(p.author_first, p.author_initial)}</b></ProfileLink> barted
+              {asPartner(p) && <> with <ProfileLink id={p.partner_id}><b>{short(p.partner_first, p.partner_initial)}</b></ProfileLink></>}
             </div>
             {p.id === top?.id && <span className="pill pink-tint">Leading</span>}
             <span className="meta">{ago(p.created_at)}</span>

@@ -32,5 +32,6 @@ $P -d bart_test -f supabase/migrations/0024_more_categories.sql
 $P -d bart_test -f supabase/migrations/0025_mark_one_read.sql
 $P -d bart_test -f supabase/migrations/0026_iso_multiple_items.sql
 $P -d bart_test -f supabase/migrations/0027_wanted_answer_links.sql
+$P -d bart_test -f supabase/migrations/0028_feed_partner.sql
 $P -d bart_test -f supabase/tests/grants_stub.sql
 $P -d bart_test -f supabase/tests/access_rules_test.sql

@@ -391,6 +391,10 @@ insert into post_comments (post_id, body) select post_id, 'Nice swap!' from post
 select t.expect_error('banned comment refused', $$insert into post_comments (post_id, body) select post_id, 'got any nudes' from post2$$, 'row-level security');
 select t.expect('feed shows counts and my like',
   (select like_count = 1 and comment_count = 1 and liked from campus_feed() where id = (select post_id from post2)));
+select t.expect('feed names both people in the trade',
+  (select partner_id is not null and partner_id <> author_id and partner_first is not null
+     and partner_id in (select case when o.from_user = f.author_id then o.to_user else o.from_user end from offers o where o.id = f.offer_id)
+   from campus_feed() f where id = (select post_id from post2)));
 select t.expect('Trade of the Week is the most-liked post', trade_of_the_week() = (select post_id from post2));
 select t.as_user('00000000-0000-0000-0000-00000000000b');
 insert into post_likes (post_id) select post_id from post1;
