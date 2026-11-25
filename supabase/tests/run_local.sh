@@ -29,5 +29,8 @@ $P -d bart_test -f supabase/migrations/0021_feed_photos.sql
 $P -d bart_test -f supabase/migrations/0022_trade_of_the_week_this_week.sql
 $P -d bart_test -f supabase/migrations/0023_trade_reviews.sql
 $P -d bart_test -f supabase/migrations/0024_more_categories.sql
+$P -d bart_test -f supabase/migrations/0025_mark_one_read.sql
+$P -d bart_test -f supabase/migrations/0026_iso_multiple_items.sql
+$P -d bart_test -f supabase/migrations/0027_wanted_answer_links.sql
 $P -d bart_test -f supabase/tests/grants_stub.sql
 $P -d bart_test -f supabase/tests/access_rules_test.sql

@@ -42,8 +42,13 @@ const readDismissed = (): string[] => { try { return JSON.parse(localStorage.get
 
 export default function Wanted() {
   const { me } = useAuth();
-  const { markRead } = useNotifications();
-  const [tab, setTab] = useState<'yours' | 'all'>('yours');
+  const { markRead, unread } = useNotifications();
+  const [tab, setTab] = useState<'yours' | 'asks' | 'all'>('yours');
+  // Your own requests (open and closed), so answers are never out of sight
+  const [mine, setMine] = useRemembered<Iso[]>('wanted:mine', []);
+  // Requests with answers you hadn't seen yet, noted when you open Your asks (so they stay marked "New")
+  const [fresh, setFresh] = useState<string[]>([]);
+  const newAnswers = unread.filter((n) => n.kind === 'iso' && n.ref);
   const [isos, setIsos] = useRemembered<Iso[] | null>('wanted:isos', null);
   const [responses, setResponses] = useRemembered<IsoResponse[]>('wanted:responses', []);
   const [closet, setCloset] = useRemembered<Listing[]>('wanted:closet', []);
@@ -82,22 +87,44 @@ export default function Wanted() {
   useEffect(() => {
     const iso = new URLSearchParams(window.location.search).get('iso');
     if (!iso) return;
+    setTab('asks');
+    setFresh((f) => (f.includes(iso) ? f : [...f, iso]));
     markRead({ ref: iso });
     window.history.replaceState(null, '', '/wanted');
+    setTimeout(() => document.getElementById(`ask-${iso}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
   }, [markRead]);
+
+  // New answers waiting: open on Your asks
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    if (opened || !newAnswers.length) return;
+    setOpened(true);
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get('ask') && !params.get('answering')) setTab('asks');
+  }, [newAnswers.length, opened]);
+
+  // Looking at Your asks clears the Wanted badge (the new ones stay marked until you leave)
+  useEffect(() => {
+    if (tab !== 'asks' || !newAnswers.length) return;
+    const refs = [...new Set(newAnswers.map((n) => n.ref as string))];
+    setFresh((f) => [...new Set([...f, ...refs])]);
+    refs.forEach((ref) => markRead({ ref }));
+  }, [tab, newAnswers, markRead]);
 
   const load = useCallback(async () => {
     if (!me) return;
-    const [{ data: i, error }, { data: r }, { data: c }] = await Promise.all([
+    const [{ data: i, error }, { data: r }, { data: c }, { data: m }] = await Promise.all([
       supabase.from('iso_posts').select('*, author:profiles!iso_posts_author_id_fkey(id,first_name,last_initial,avatar_path)').eq('open', true)
         .order('created_at', { ascending: false }).limit(100),
       supabase.from('iso_responses').select('iso_id,responder_id,listing:listings!iso_responses_listing_id_fkey(id,title),responder:profiles!iso_responses_responder_id_fkey(id,first_name,last_initial,avatar_path)'),
       supabase.from('listings').select('*').eq('owner_id', me.id).eq('status', 'active').order('created_at', { ascending: false }),
+      supabase.from('iso_posts').select('*').eq('author_id', me.id).order('created_at', { ascending: false }).limit(50),
     ]);
     if (error) setError(friendlyError(error));
     setIsos((i ?? []) as unknown as Iso[]);
     setResponses((r ?? []) as unknown as IsoResponse[]);
     setCloset((c ?? []) as Listing[]);
+    setMine((m ?? []) as unknown as Iso[]);
   }, [me]);
 
   useEffect(() => { load(); }, [load]);
@@ -167,9 +194,12 @@ export default function Wanted() {
 
         <div className="segmented">
           <button className={tab === 'yours' ? 'on' : ''} onClick={() => setTab('yours')}>
-            Wants your stuff{openMatches ? ` (${openMatches})` : ''}
+            For you{openMatches ? ` (${openMatches})` : ''}
           </button>
-          <button className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>All requests</button>
+          <button className={tab === 'asks' ? 'on' : ''} onClick={() => setTab('asks')}>
+            Your asks{newAnswers.length ? ` (${new Set(newAnswers.map((n) => n.ref)).size})` : ''}
+          </button>
+          <button className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>All</button>
         </div>
 
         {error && <div className="alert">{error}</div>}
@@ -220,6 +250,52 @@ export default function Wanted() {
                 )}
               </div>
             ))}
+          </>
+        )}
+
+        {isos && me && tab === 'asks' && (
+          <>
+            {mine.length === 0 && (
+              <div className="empty">
+                You haven&apos;t asked for anything yet.{' '}
+                <button className="text-btn" style={{ padding: 0 }} onClick={() => { setComposing(true); setTab('all'); }}>Ask for something</button>
+              </div>
+            )}
+            {[...mine].sort((a, b) => Number(b.open) - Number(a.open)).map((i) => {
+              const answers = responses.filter((r) => r.iso_id === i.id);
+              const isNew = fresh.includes(i.id);
+              return (
+                <div key={i.id} id={`ask-${i.id}`} className="card stack" style={{ gap: 8, opacity: i.open ? 1 : 0.75 }}>
+                  <div className="spread">
+                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: '#C8106A' }}>
+                      {i.open ? 'YOU\'RE LOOKING FOR' : 'FOUND'}
+                    </span>
+                    <span className="row" style={{ gap: 8 }}>
+                      {isNew && <span className="pill" style={{ background: 'var(--pink)', color: '#fff', padding: '2px 8px', fontSize: 11 }}>New</span>}
+                      <span className="meta">{ago(i.created_at)}</span>
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>{i.want}</div>
+                  {i.can_offer && <div className="meta" style={{ fontSize: 13 }}>Can give: {i.can_offer}</div>}
+                  {answers.length === 0 && <span className="meta">No one has answered yet.</span>}
+                  {answers.map((a) => (
+                    <Link key={`${a.responder_id}-${a.listing?.id}`} href={a.listing ? `/item/${a.listing.id}` : '#'} className="spread"
+                      style={{ background: 'var(--green-tint)', borderRadius: 12, padding: '10px 12px', color: 'var(--ink)', fontSize: 14, gap: 10 }}>
+                      <span className="row" style={{ gap: 10, minWidth: 0 }}>
+                        <Avatar profile={a.responder} size={28} />
+                        <span><b>{a.responder?.first_name}</b> has {a.listing?.title}</span>
+                      </span>
+                      <span>›</span>
+                    </Link>
+                  ))}
+                  {i.open && (
+                    <button className="text-btn" style={{ padding: 0, alignSelf: 'flex-start', color: 'var(--muted)', fontSize: 13 }} onClick={() => close(i.id)}>
+                      {answers.length ? 'Found it' : 'Remove'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </>
         )}
 

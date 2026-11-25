@@ -445,6 +445,8 @@ select t.as_user('00000000-0000-0000-0000-00000000000b');
 select t.expect('others cannot see who responded', not exists (select 1 from iso_responses));
 select t.as_user('00000000-0000-0000-0000-00000000000c');
 select t.expect('ISO author sees the response', exists (select 1 from iso_responses where iso_id = '40000000-0000-0000-0000-000000000001'));
+select t.expect('the answer notification opens Wanted',
+  exists (select 1 from notifications where user_id = auth.uid() and kind = 'iso' and link = '/wanted?iso=40000000-0000-0000-0000-000000000001'));
 update iso_posts set open = false where id = '40000000-0000-0000-0000-000000000001';
 select t.as_user('00000000-0000-0000-0000-00000000000b');
 update iso_posts set open = true where id = '40000000-0000-0000-0000-000000000001';
@@ -475,7 +477,7 @@ select t.expect_error('cannot create notifications directly',
 select t.expect_error('cannot call notify directly',
   $$select notify('00000000-0000-0000-0000-00000000000b', 'me', 'x', 'spam', '/', null)$$, 'permission denied');
 select t.as_user('00000000-0000-0000-0000-00000000000c');
-select t.expect('ISO author told about the answer', exists (select 1 from notifications where kind = 'iso' and body like 'Alex has Desk lamp, brass for your ISO'));
+select t.expect('ISO author told about the answer', exists (select 1 from notifications where kind = 'iso' and body like 'Alex has Desk lamp, brass for your request'));
 -- Saved item traded away
 select t.as_user('00000000-0000-0000-0000-00000000000b');
 insert into saves (listing_id) values ('20000000-0000-0000-0000-000000000003');
